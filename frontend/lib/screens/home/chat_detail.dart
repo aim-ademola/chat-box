@@ -35,7 +35,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   bool _loading = true;
   String? _historyError;
   String? _fatalError;
-  String? _aiError;
   AiSummaryModel? _aiSummary;
 
   @override
@@ -361,7 +360,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             if (!mounted) return;
             setState(() {
               _aiSummary = summary;
-              _aiError = null;
             });
           },
         ),
@@ -425,121 +423,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           TextButton(
             onPressed: () => _bootstrap(reset: true),
             child: const Text('Retry'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAiSummaryPanel(ColorScheme colorScheme, AppThemeColors palette) {
-    final summary = _aiSummary;
-    final hasInsight = summary != null;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.auto_awesome_rounded,
-                color: colorScheme.primary,
-                size: 22,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'AI chat summary',
-                  style: AppStyle.circularTextStyle(
-                    size: 15,
-                    weight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: _openAiSheet,
-                child: Text(hasInsight ? 'Ask' : 'Open'),
-              ),
-            ],
-          ),
-          if (_aiError != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _aiError!,
-              style: AppStyle.circularTextStyle(
-                size: 13,
-                weight: FontWeight.w600,
-                color: palette.offline,
-              ),
-            ),
-          ],
-          if (summary != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              summary.summary,
-              style: AppStyle.circularTextStyle(
-                size: 14,
-                weight: FontWeight.w500,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildAiChip(
-                  colorScheme,
-                  '${summary.messageCount} messages',
-                  Icons.chat_bubble_outline_rounded,
-                ),
-                if (summary.openQuestions.isNotEmpty)
-                  _buildAiChip(
-                    colorScheme,
-                    '${summary.openQuestions.length} need reply',
-                    Icons.help_outline_rounded,
-                  ),
-                if (summary.meetingSuggestions.isNotEmpty)
-                  _buildAiChip(
-                    colorScheme,
-                    '${summary.meetingSuggestions.length} possible meeting',
-                    Icons.event_available_outlined,
-                  ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAiChip(ColorScheme colorScheme, String label, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: colorScheme.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: AppStyle.circularTextStyle(
-              size: 12,
-              weight: FontWeight.w700,
-              color: colorScheme.onSurface,
-            ),
           ),
         ],
       ),
@@ -893,8 +776,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       )
                     : Column(
                         children: [
-                          _buildAiSummaryPanel(colorScheme, palette),
-                          const SizedBox(height: 12),
                           _buildHistoryBanner(palette),
                           const SizedBox(height: 12),
                           Expanded(

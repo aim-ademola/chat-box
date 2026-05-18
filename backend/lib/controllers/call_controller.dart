@@ -50,7 +50,7 @@ class CallController {
     final callerUid = _tokenService.uidForUser(user.id);
     final recipientUid = _tokenService.uidForUser(recipientId);
     final channelName =
-        'call_${user.id}_${recipientId}_${startedAt.microsecondsSinceEpoch}';
+        'call${callerUid}x${recipientUid}x${startedAt.millisecondsSinceEpoch}';
 
     final created = await Call().create({
       'conversationId': conversationId?.isEmpty == true ? null : conversationId,

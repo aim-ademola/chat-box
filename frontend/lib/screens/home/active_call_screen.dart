@@ -105,6 +105,11 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
           clientRoleType: ClientRoleType.clientRoleBroadcaster,
         ),
       );
+    } on AgoraRtcException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _statusText = _friendlyAgoraError(e);
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -332,6 +337,14 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
         .map((part) => part[0].toUpperCase())
         .join();
     return initials.isEmpty ? 'U' : initials;
+  }
+
+  String _friendlyAgoraError(AgoraRtcException error) {
+    if (error.code == -102 || error.code == 102) {
+      return 'Agora rejected this call channel. Please try starting the call again.';
+    }
+
+    return 'Agora call error ${error.code}. Please try again.';
   }
 
   @override
