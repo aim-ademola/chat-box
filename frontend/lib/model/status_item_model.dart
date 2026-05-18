@@ -15,7 +15,6 @@ class StatusItemModel {
   final String? userId;
 
   factory StatusItemModel.fromMap(Map<String, dynamic> map) {
-    final user = Map<String, dynamic>.from(map['user'] ?? <String, dynamic>{});
     return StatusItemModel(
       id: '${map['id']}',
       content: '${map['content'] ?? ''}',
