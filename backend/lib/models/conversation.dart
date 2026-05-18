@@ -38,7 +38,6 @@ class Conversation extends Model<Conversation> {
           ownerKey: 'id',
         ),
       };
-      
 
   @override
   Table get table => Table(

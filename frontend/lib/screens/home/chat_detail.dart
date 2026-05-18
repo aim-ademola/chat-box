@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/core/theme/theme.dart';
+import 'package:frontend/model/ai_summary_model.dart';
 import 'package:frontend/model/chat_message_model.dart';
 import 'package:frontend/model/message_item_model.dart';
 import 'package:frontend/provider/auth_provider.dart';
+import 'package:frontend/repositry/ai_repositry.dart';
 import 'package:frontend/repositry/chat_repositry.dart';
 import 'package:frontend/widget/chat_thread_item_widget.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
@@ -31,6 +33,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   bool _loading = true;
   String? _historyError;
   String? _fatalError;
+  bool _aiLoading = false;
+  String? _aiError;
+  AiSummaryModel? _aiSummary;
 
   @override
   void initState() {
@@ -282,6 +287,37 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     });
   }
 
+  Future<void> _summarizeConversation() async {
+    final roomId = _roomId;
+    if (roomId == null || roomId.trim().isEmpty) {
+      _showSnackBar('Chat is still loading.');
+      return;
+    }
+
+    setState(() {
+      _aiLoading = true;
+      _aiError = null;
+    });
+
+    try {
+      final summary = await ref
+          .read(aiRepositryProvider)
+          .getChatSummary(conversationId: roomId);
+
+      if (!mounted) return;
+      setState(() {
+        _aiSummary = summary;
+        _aiLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _aiError = 'Could not summarize this chat right now.';
+        _aiLoading = false;
+      });
+    }
+  }
+
   String get _statusLabel {
     if (_fatalError != null) {
       return 'Unavailable';
@@ -338,6 +374,130 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           TextButton(
             onPressed: () => _bootstrap(reset: true),
             child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiSummaryPanel(ColorScheme colorScheme, AppThemeColors palette) {
+    final summary = _aiSummary;
+    final hasInsight = summary != null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome_rounded,
+                color: colorScheme.primary,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'AI chat summary',
+                  style: AppStyle.circularTextStyle(
+                    size: 15,
+                    weight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _aiLoading ? null : _summarizeConversation,
+                child: _aiLoading
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.primary,
+                        ),
+                      )
+                    : Text(hasInsight ? 'Refresh' : 'Summarize'),
+              ),
+            ],
+          ),
+          if (_aiError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _aiError!,
+              style: AppStyle.circularTextStyle(
+                size: 13,
+                weight: FontWeight.w600,
+                color: palette.offline,
+              ),
+            ),
+          ],
+          if (summary != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              summary.summary,
+              style: AppStyle.circularTextStyle(
+                size: 14,
+                weight: FontWeight.w500,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildAiChip(
+                  colorScheme,
+                  '${summary.messageCount} messages',
+                  Icons.chat_bubble_outline_rounded,
+                ),
+                if (summary.openQuestions.isNotEmpty)
+                  _buildAiChip(
+                    colorScheme,
+                    '${summary.openQuestions.length} need reply',
+                    Icons.help_outline_rounded,
+                  ),
+                if (summary.meetingSuggestions.isNotEmpty)
+                  _buildAiChip(
+                    colorScheme,
+                    '${summary.meetingSuggestions.length} possible meeting',
+                    Icons.event_available_outlined,
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiChip(ColorScheme colorScheme, String label, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppStyle.circularTextStyle(
+              size: 12,
+              weight: FontWeight.w700,
+              color: colorScheme.onSurface,
+            ),
           ),
         ],
       ),
@@ -613,6 +773,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       )
                     : Column(
                         children: [
+                          _buildAiSummaryPanel(colorScheme, palette),
+                          const SizedBox(height: 12),
                           _buildHistoryBanner(palette),
                           const SizedBox(height: 12),
                           Expanded(

@@ -13,6 +13,30 @@
     }
   ],
   "paths": {
+    "/ai/chats/{conversationId}/summary": {
+      "get": {
+        "summary": "",
+        "tags": [
+          "Default"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter: conversationId"
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "summary": "",

@@ -7,7 +7,7 @@ environment:
   sdk: ^3.2.0
 
 dependencies:
-  flint_dart: ^1.0.2
+  flint_dart: ^1.1.0
 
 
 dependency_overrides:

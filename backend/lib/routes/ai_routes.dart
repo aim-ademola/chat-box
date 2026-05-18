@@ -1,0 +1,18 @@
+import 'package:backend/controllers/ai_controller.dart';
+import 'package:backend/middlewares/auth_middleware.dart';
+import 'package:flint_dart/flint_dart.dart';
+
+class AiRoutes extends RouteGroup {
+  @override
+  String get prefix => '/ai';
+
+  @override
+  void register(Flint app) {
+    final controller = AiController();
+
+    app.get(
+      '/chats/:conversationId/summary',
+      AuthMiddleware().handle(controller.chatSummary),
+    );
+  }
+}

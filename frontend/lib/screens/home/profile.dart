@@ -68,10 +68,7 @@ class _ProfileState extends State<Profile> {
                     ),
                   ),
                   SizedBox(height: 10),
-                  Row(children: [
-                      
-                    ],
-                  ),
+                  Row(children: []),
 
                   SizedBox(height: 20),
                   Container(

@@ -76,14 +76,16 @@ class ChatMessageModel {
         : <String, dynamic>{};
     final senderId = map['senderId']?.toString();
     final recipientId = map['recipientId']?.toString();
-    final sentAt = map['sentAt']?.toString() ??
+    final sentAt =
+        map['sentAt']?.toString() ??
         map['createdAt']?.toString() ??
         map['created_at']?.toString();
     final type = _parseType(map['messageType'] ?? map['type']);
     final senderName =
         sender['name']?.toString() ?? map['senderName']?.toString();
     final senderProfilePicUrl =
-        sender['profilePicUrl']?.toString() ?? map['senderProfilePicUrl']?.toString();
+        sender['profilePicUrl']?.toString() ??
+        map['senderProfilePicUrl']?.toString();
 
     return ChatMessageModel(
       id: map['id']?.toString(),
