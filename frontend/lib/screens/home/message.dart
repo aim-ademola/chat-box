@@ -5,7 +5,6 @@ import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/core/extention/build_context_ext.dart';
 import 'package:frontend/core/theme/theme.dart';
 import 'package:frontend/model/message_item_model.dart';
-import 'package:frontend/model/status_item_model.dart';
 import 'package:frontend/model/story_item_model.dart';
 import 'package:frontend/provider/recent_chat_provider.dart';
 import 'package:frontend/provider/status_provider.dart';
@@ -33,14 +32,6 @@ class MessageScreen extends ConsumerStatefulWidget {
 }
 
 class _MessageScreenState extends ConsumerState<MessageScreen> {
-  static const _storyPalette = [
-    Color(0xFFFFC94D),
-    Color(0xFFF6B6C1),
-    Color(0xFFDCE7F8),
-    Color(0xFFE2D7CB),
-    Color(0xFFD7E0F4),
-  ];
-
   Future<void> _openUploadStatus() async {
     await Navigator.push(
       context,

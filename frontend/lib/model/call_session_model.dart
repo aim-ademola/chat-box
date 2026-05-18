@@ -49,4 +49,21 @@ class CallSessionModel {
       isOutgoing: map['isOutgoing'] == true,
     );
   }
+
+  CallSessionModel copyWith({String? peerName, String? peerProfilePicUrl}) {
+    return CallSessionModel(
+      id: id,
+      conversationId: conversationId,
+      channelName: channelName,
+      callType: callType,
+      status: status,
+      agoraAppId: agoraAppId,
+      agoraToken: agoraToken,
+      agoraUid: agoraUid,
+      peerName: peerName ?? this.peerName,
+      peerId: peerId,
+      peerProfilePicUrl: peerProfilePicUrl ?? this.peerProfilePicUrl,
+      isOutgoing: isOutgoing,
+    );
+  }
 }

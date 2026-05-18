@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/core/constant/app_colors.dart';
 

@@ -250,19 +250,24 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   }
 
   Widget _buildAudioStage() {
+    final peerName = widget.session.peerName.trim().isEmpty
+        ? 'Contact'
+        : widget.session.peerName.trim();
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           UserAvatarWidget(
-            initials: _initials(widget.session.peerName),
+            initials: _initials(peerName),
             backgroundColor: AppColors.primary,
             radius: 54,
             profilePicUrl: widget.session.peerProfilePicUrl,
           ),
           const SizedBox(height: 20),
           Text(
-            widget.session.peerName,
+            peerName,
+            textAlign: TextAlign.center,
             style: AppStyle.circularTextStyle(
               size: 26,
               weight: FontWeight.w700,

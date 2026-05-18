@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flint_client/flint_client.dart';
-import 'package:flutter/animation.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/model/status_item_model.dart';
 import 'package:frontend/model/story_item_model.dart';
@@ -52,7 +51,6 @@ class StatusRepositry {
     final res = await client.get("/status", headers: headers);
     res.throwIfError();
 
-    print("This is the data ${res.data}");
     var data;
     try {
       data = (res.data['data'] as List<dynamic>)

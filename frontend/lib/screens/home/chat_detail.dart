@@ -318,11 +318,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             conversationId: roomId,
             callType: callType,
           );
+      final displaySession = session.copyWith(
+        peerName: widget.contact.name,
+        peerProfilePicUrl: widget.contact.profilePicUrl,
+      );
 
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => ActiveCallScreen(session: session)),
+        MaterialPageRoute(
+          builder: (_) => ActiveCallScreen(session: displaySession),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
