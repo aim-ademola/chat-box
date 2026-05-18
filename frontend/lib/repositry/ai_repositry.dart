@@ -22,8 +22,9 @@ class AiRepositry {
     res.throwIfError();
 
     final responseData = res.data;
-    final data = responseData is Map
-        ? Map<String, dynamic>.from(responseData['data'] as Map)
+    final rawData = responseData is Map ? responseData['data'] : null;
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
         : <String, dynamic>{};
 
     return AiSummaryModel.fromMap(data);

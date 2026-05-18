@@ -2,7 +2,7 @@ import 'package:backend/helper/auth_helper.dart';
 import 'package:backend/models/conversation.dart';
 import 'package:backend/models/chat_message.dart';
 import 'package:backend/models/user_model.dart';
-import 'package:flint_dart/flint_dart.dart' hide ChatMessage;
+import 'package:flint_dart/flint_dart.dart';
 
 class ChatController {
   Future<Response?> history(Context ctx) async {
