@@ -14,5 +14,9 @@ class AiRoutes extends RouteGroup {
       '/chats/:conversationId/summary',
       AuthMiddleware().handle(controller.chatSummary),
     );
+    app.post(
+      '/chats/:conversationId/ask',
+      AuthMiddleware().handle(controller.chatAsk),
+    );
   }
 }

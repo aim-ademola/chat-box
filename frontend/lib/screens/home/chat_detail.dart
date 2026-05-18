@@ -7,11 +7,11 @@ import 'package:frontend/model/ai_summary_model.dart';
 import 'package:frontend/model/chat_message_model.dart';
 import 'package:frontend/model/message_item_model.dart';
 import 'package:frontend/provider/auth_provider.dart';
-import 'package:frontend/repositry/ai_repositry.dart';
 import 'package:frontend/repositry/call_repositry.dart';
 import 'package:frontend/repositry/chat_repositry.dart';
 import 'package:frontend/screens/home/active_call_screen.dart';
 import 'package:frontend/widget/chat_thread_item_widget.dart';
+import 'package:frontend/widget/ai_conversation_sheet.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
@@ -35,7 +35,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   bool _loading = true;
   String? _historyError;
   String? _fatalError;
-  bool _aiLoading = false;
   String? _aiError;
   AiSummaryModel? _aiSummary;
 
@@ -331,35 +330,37 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     }
   }
 
-  Future<void> _summarizeConversation() async {
+  Future<void> _openAiSheet() async {
     final roomId = _roomId;
     if (roomId == null || roomId.trim().isEmpty) {
       _showSnackBar('Chat is still loading.');
       return;
     }
 
-    setState(() {
-      _aiLoading = true;
-      _aiError = null;
-    });
-
-    try {
-      final summary = await ref
-          .read(aiRepositryProvider)
-          .getChatSummary(conversationId: roomId);
-
-      if (!mounted) return;
-      setState(() {
-        _aiSummary = summary;
-        _aiLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _aiError = 'Could not summarize this chat right now.';
-        _aiLoading = false;
-      });
-    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.88,
+        child: AiConversationSheet(
+          conversationId: roomId,
+          contactName: widget.contact.name,
+          initialSummary: _aiSummary,
+          onSummaryLoaded: (summary) {
+            if (!mounted) return;
+            setState(() {
+              _aiSummary = summary;
+              _aiError = null;
+            });
+          },
+        ),
+      ),
+    );
   }
 
   String get _statusLabel {
@@ -458,17 +459,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 ),
               ),
               TextButton(
-                onPressed: _aiLoading ? null : _summarizeConversation,
-                child: _aiLoading
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colorScheme.primary,
-                        ),
-                      )
-                    : Text(hasInsight ? 'Refresh' : 'Summarize'),
+                onPressed: _openAiSheet,
+                child: Text(hasInsight ? 'Ask' : 'Open'),
               ),
             ],
           ),
@@ -565,29 +557,19 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   Widget _buildAiHeaderMenu(ColorScheme colorScheme) {
     return PopupMenuButton<String>(
       tooltip: 'AI tools',
-      enabled: !_aiLoading,
-      icon: _aiLoading
-          ? SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: colorScheme.primary,
-              ),
-            )
-          : Icon(
-              Icons.auto_awesome_rounded,
-              size: 28,
-              color: colorScheme.primary,
-            ),
+      icon: Icon(
+        Icons.auto_awesome_rounded,
+        size: 28,
+        color: colorScheme.primary,
+      ),
       onSelected: (value) {
         switch (value) {
           case 'summary':
-            _summarizeConversation();
+            _openAiSheet();
             break;
           case 'reply':
           case 'meeting':
-            _showSnackBar('This AI tool is coming next.');
+            _openAiSheet();
             break;
         }
       },

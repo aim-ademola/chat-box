@@ -61,6 +61,74 @@ class AiController {
     });
   }
 
+  Future<Response?> chatAsk(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({
+        'status': false,
+        'message': 'Unauthorized',
+      });
+    }
+
+    final conversationId = ctx.req.param('conversationId');
+    if (conversationId == null || conversationId.trim().isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Conversation id is required',
+      });
+    }
+
+    final body = await ctx.req.json();
+    final question = body['question']?.toString().trim() ?? '';
+    if (question.isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Question is required',
+      });
+    }
+
+    final cleanConversationId = conversationId.trim();
+    final canAccess =
+        await _canAccessConversation(cleanConversationId, user.id);
+
+    if (!canAccess) {
+      return res.status(403).json({
+        'status': false,
+        'message': 'You cannot ask about this conversation',
+      });
+    }
+
+    final messages = await _conversationMessages(cleanConversationId);
+    final answer = _aiService.answerChatQuestion(
+      messages: messages,
+      currentUserId: user.id,
+      question: question,
+    );
+
+    return res.json({
+      'status': true,
+      'data': {
+        'conversationId': cleanConversationId,
+        'question': question,
+        ...answer,
+      },
+    });
+  }
+
+  Future<List<ChatMessage>> _conversationMessages(
+    String conversationId,
+  ) async {
+    return ChatMessage()
+        .where('conversationId', conversationId)
+        .withRelation('sender')
+        .orderBy('sentAt', asc: true)
+        .limit(150)
+        .get();
+  }
+
   Future<bool> _canAccessConversation(
     String conversationId,
     String currentUserId,

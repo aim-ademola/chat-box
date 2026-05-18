@@ -29,6 +29,27 @@ class AiRepositry {
 
     return AiSummaryModel.fromMap(data);
   }
+
+  Future<String> askChat({
+    required String conversationId,
+    required String question,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/ai/chats/$conversationId/ask',
+      headers: headers,
+      body: {'question': question},
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final rawData = responseData is Map ? responseData['data'] : null;
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+
+    return data['answer']?.toString() ?? 'No answer available.';
+  }
 }
 
 final aiRepositryProvider = Provider<AiRepositry>((ref) {
