@@ -6,6 +6,8 @@ import 'package:frontend/core/extention/build_context_ext.dart';
 import 'package:frontend/core/theme/theme.dart';
 import 'package:frontend/model/message_item_model.dart';
 import 'package:frontend/model/story_item_model.dart';
+import 'package:frontend/model/user_model.dart';
+import 'package:frontend/provider/auth_provider.dart';
 import 'package:frontend/provider/recent_chat_provider.dart';
 import 'package:frontend/provider/status_provider.dart';
 import 'package:frontend/screens/home/chat_detail.dart';
@@ -15,14 +17,6 @@ import 'package:frontend/widget/circle_icon_button_widget.dart';
 import 'package:frontend/widget/message_tile_widget.dart';
 import 'package:frontend/widget/profile_avatar_widget.dart';
 import 'package:frontend/widget/story_avatar_widget.dart';
-
-var _myStory = StoryItemModel(
-  name: 'My status',
-  initials: 'ME',
-  backgroundColor: Color(0xFFD9E8E5),
-  ringColor: Color(0xFF5CB6AA),
-  isMine: true,
-);
 
 class MessageScreen extends ConsumerStatefulWidget {
   const MessageScreen({super.key});
@@ -52,16 +46,60 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
     }
   }
 
-  Future<void> _openStatusPreview(StoryItemModel story) async {
-    if (story.userId == null) {
+  Future<void> _openMyStatus(UserModel? user) async {
+    if (user == null || user.id.isEmpty) {
       return;
     }
 
     final statuses = await ref
         .read(statusProvider.notifier)
-        .fetchStatusesByUser(story.userId!);
+        .fetchStatusesByUser(user.id);
 
-    if (!mounted || statuses.isEmpty) {
+    if (!mounted) {
+      return;
+    }
+
+    if (statuses.isEmpty || (statuses.first.statuses ?? []).isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You have not posted a status yet.')),
+      );
+      return;
+    }
+
+    final story = statuses.first;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StatusPreviewScreen(
+          userName: story.name,
+          userInitials: story.initials,
+          userProfilePicUrl: story.profilePicUrl ?? '',
+          statuses: story.statuses ?? [],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openStatusPreview(StoryItemModel story) async {
+    if (story.userId == null) {
+      return;
+    }
+
+    var previewStory = story;
+    var statusItems = story.statuses ?? [];
+
+    if (statusItems.isEmpty) {
+      final statuses = await ref
+          .read(statusProvider.notifier)
+          .fetchStatusesByUser(story.userId!);
+
+      if (statuses.isNotEmpty) {
+        previewStory = statuses.first;
+        statusItems = previewStory.statuses ?? [];
+      }
+    }
+
+    if (!mounted || statusItems.isEmpty) {
       return;
     }
 
@@ -69,10 +107,10 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => StatusPreviewScreen(
-          userName: statuses.first.name,
-          userInitials: statuses.first.initials,
-          userProfilePicUrl: statuses.first.profilePicUrl ?? '',
-          statuses: statuses.first.statuses ?? [],
+          userName: previewStory.name,
+          userInitials: previewStory.initials,
+          userProfilePicUrl: previewStory.profilePicUrl ?? '',
+          statuses: statusItems,
         ),
       ),
     );
@@ -81,8 +119,10 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final user = ref.watch(authProvider).value;
     final statusesState = ref.watch(statusProvider);
     final recentChatsState = ref.watch(recentChatsProvider);
+    final myStory = _myStoryFor(user);
 
     return DecoratedBox(
       decoration: BoxDecoration(color: context.palette.headerBackground),
@@ -129,7 +169,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
               height: 168,
               child: statusesState.when(
                 data: (statuses) {
-                  final stories = <StoryItemModel>[_myStory, ...statuses];
+                  final stories = <StoryItemModel>[myStory, ...statuses];
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
                     scrollDirection: Axis.horizontal,
@@ -138,7 +178,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                       return StoryAvatarWidget(
                         item: story,
                         onTap: story.isMine
-                            ? _openUploadStatus
+                            ? () => _openMyStatus(user)
                             : () => _openStatusPreview(story),
                         onAddTap: story.isMine ? _openUploadStatus : null,
                       );
@@ -153,8 +193,8 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                   scrollDirection: Axis.horizontal,
                   children: [
                     StoryAvatarWidget(
-                      item: _myStory,
-                      onTap: _openUploadStatus,
+                      item: myStory,
+                      onTap: () => _openMyStatus(user),
                       onAddTap: _openUploadStatus,
                     ),
                   ],
@@ -164,8 +204,8 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                   scrollDirection: Axis.horizontal,
                   children: [
                     StoryAvatarWidget(
-                      item: _myStory,
-                      onTap: _openUploadStatus,
+                      item: myStory,
+                      onTap: () => _openMyStatus(user),
                       onAddTap: _openUploadStatus,
                     ),
                   ],
@@ -250,6 +290,34 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
         ),
       ),
     );
+  }
+
+  StoryItemModel _myStoryFor(UserModel? user) {
+    final displayName = user?.name.trim().isNotEmpty == true
+        ? user!.name.trim()
+        : 'My status';
+
+    return StoryItemModel(
+      name: 'My status',
+      initials: _initials(displayName),
+      backgroundColor: const Color(0xFFD9E8E5),
+      ringColor: const Color(0xFF5CB6AA),
+      profilePicUrl: user?.profilePicUrl,
+      userId: user?.id,
+      isMine: true,
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .toList();
+
+    final value = parts.map((part) => part[0].toUpperCase()).join();
+    return value.isEmpty ? 'ME' : value;
   }
 
   Widget _buildEmptyChatState(ColorScheme colorScheme, AppThemeColors palette) {

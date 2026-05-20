@@ -22,9 +22,9 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     final palette = Theme.of(context).extension<AppThemeColors>()!;
     final calls = ref.watch(recentCallsProvider);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(color: palette.headerBackground),
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: palette.headerBackground,
+      body: SafeArea(
         bottom: false,
         child: Column(
           children: [

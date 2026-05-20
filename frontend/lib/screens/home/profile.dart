@@ -23,9 +23,9 @@ class Profile extends ConsumerWidget {
         : 'No email available';
     final initials = _initials(displayName);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(color: context.palette.headerBackground),
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: context.palette.headerBackground,
+      body: SafeArea(
         bottom: false,
         child: Column(
           children: [

@@ -55,6 +55,7 @@ class StoryAvatarWidget extends StatelessWidget {
                     right: -2,
                     bottom: 0,
                     child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: onAddTap ?? onTap,
                       child: Container(
                         width: 31,

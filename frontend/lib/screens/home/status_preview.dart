@@ -33,6 +33,41 @@ class _StatusPreviewScreenState extends ConsumerState<StatusPreviewScreen> {
     super.dispose();
   }
 
+  bool get _hasStatuses => widget.statuses.isNotEmpty;
+
+  void _goToStatus(int index) {
+    if (!_hasStatuses || index < 0 || index >= widget.statuses.length) {
+      return;
+    }
+
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _goNext() {
+    if (!_hasStatuses) {
+      return;
+    }
+
+    if (_currentIndex >= widget.statuses.length - 1) {
+      Navigator.pop(context);
+      return;
+    }
+
+    _goToStatus(_currentIndex + 1);
+  }
+
+  void _goPrevious() {
+    if (_currentIndex == 0) {
+      return;
+    }
+
+    _goToStatus(_currentIndex - 1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -48,21 +83,27 @@ class _StatusPreviewScreenState extends ConsumerState<StatusPreviewScreen> {
                 children: [
                   Row(
                     children: List.generate(
-                      widget.statuses.length,
-                      (index) => Expanded(
-                        child: Container(
-                          height: 4,
-                          margin: EdgeInsets.only(
-                            right: index == widget.statuses.length - 1 ? 0 : 6,
+                      widget.statuses.isEmpty ? 1 : widget.statuses.length,
+                      (index) {
+                        final isActive =
+                            widget.statuses.isEmpty || index <= _currentIndex;
+                        final isLast =
+                            widget.statuses.isEmpty ||
+                            index == widget.statuses.length - 1;
+
+                        return Expanded(
+                          child: Container(
+                            height: 4,
+                            margin: EdgeInsets.only(right: isLast ? 0 : 6),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.28),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: index <= _currentIndex
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.28),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -98,69 +139,251 @@ class _StatusPreviewScreenState extends ConsumerState<StatusPreviewScreen> {
               ),
             ),
             Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: widget.statuses.length,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                itemBuilder: (context, index) {
-                  final status = widget.statuses[index];
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(36),
-                        gradient: LinearGradient(
-                          colors: [
-                            colorScheme.primary.withValues(alpha: 0.92),
-                            const Color(0xFF103A35),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+              child: _hasStatuses
+                  ? Stack(
+                      children: [
+                        PageView.builder(
+                          controller: _pageController,
+                          itemCount: widget.statuses.length,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentIndex = index;
+                            });
+                          },
+                          itemBuilder: (context, index) {
+                            return _StatusPage(
+                              status: widget.statuses[index],
+                              colorScheme: colorScheme,
+                            );
+                          },
                         ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (status.url != null && status.url!.isNotEmpty) ...[
-                            if (status.type == 'video')
-                              _VideoStatusTile(url: status.url!)
-                            else
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(28),
-                                child: Image.network(
-                                  status.url ?? "",
-                                  height: 260,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
+                        Positioned.fill(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.translucent,
+                                  onTap: _goPrevious,
                                 ),
                               ),
-                            const SizedBox(height: 24),
-                          ],
-                          Text(
-                            status.content ?? 'No caption',
-                            textAlign: TextAlign.center,
-                            style: AppStyle.circularTextStyle(
-                              size: 24,
-                              weight: FontWeight.w700,
-                              color: Colors.white,
-                              height: 1.35,
+                              Expanded(
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.translucent,
+                                  onTap: _goNext,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Positioned(
+                          left: 16,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: IconButton.filledTonal(
+                              onPressed: _currentIndex == 0
+                                  ? null
+                                  : _goPrevious,
+                              icon: const Icon(Icons.chevron_left_rounded),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+                        ),
+                        Positioned(
+                          right: 16,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: IconButton.filledTonal(
+                              onPressed: _goNext,
+                              icon: Icon(
+                                _currentIndex == widget.statuses.length - 1
+                                    ? Icons.check_rounded
+                                    : Icons.chevron_right_rounded,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: 24,
+                          bottom: 28,
+                          child: FilledButton.icon(
+                            onPressed: _goNext,
+                            icon: Icon(
+                              _currentIndex == widget.statuses.length - 1
+                                  ? Icons.check_rounded
+                                  : Icons.chevron_right_rounded,
+                            ),
+                            label: Text(
+                              _currentIndex == widget.statuses.length - 1
+                                  ? 'Done'
+                                  : 'Next',
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : _EmptyStatusView(colorScheme: colorScheme),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatusPage extends StatelessWidget {
+  const _StatusPage({required this.status, required this.colorScheme});
+
+  final StatusItemModel status;
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = (status.type ?? 'text').trim().toLowerCase();
+    final hasCaption = status.content?.trim().isNotEmpty == true;
+    final hasMedia = status.url?.trim().isNotEmpty == true;
+    final showImage = hasMedia && type == 'image';
+    final showVideo = hasMedia && type == 'video';
+    final showUnknownMedia =
+        hasMedia && type != 'text' && !showImage && !showVideo;
+    final showCaption = hasCaption && (type == 'text' || hasMedia);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(36),
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.primary.withValues(alpha: 0.92),
+              const Color(0xFF103A35),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (showVideo) ...[
+              _VideoStatusTile(url: status.url!),
+              if (showCaption) const SizedBox(height: 24),
+            ] else if (showImage || showUnknownMedia) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Image.network(
+                  status.url!,
+                  height: 320,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      _BrokenMediaTile(url: status.url!),
+                ),
+              ),
+              if (showCaption) const SizedBox(height: 24),
+            ],
+            if (showCaption)
+              Text(
+                status.content!.trim(),
+                textAlign: TextAlign.center,
+                style: AppStyle.circularTextStyle(
+                  size: type == 'text' && !hasMedia ? 28 : 20,
+                  weight: FontWeight.w700,
+                  color: Colors.white,
+                  height: 1.35,
+                ),
+              )
+            else if (!showImage && !showVideo && !showUnknownMedia)
+              Text(
+                'No status content',
+                textAlign: TextAlign.center,
+                style: AppStyle.circularTextStyle(
+                  size: 22,
+                  weight: FontWeight.w700,
+                  color: Colors.white.withValues(alpha: 0.8),
+                  height: 1.35,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyStatusView extends StatelessWidget {
+  const _EmptyStatusView({required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Text(
+          'No status available',
+          textAlign: TextAlign.center,
+          style: AppStyle.circularTextStyle(
+            size: 22,
+            weight: FontWeight.w700,
+            color: Colors.white.withValues(alpha: 0.82),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrokenMediaTile extends StatelessWidget {
+  const _BrokenMediaTile({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 260,
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.broken_image_outlined,
+            color: Colors.white,
+            size: 54,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Could not load media',
+            textAlign: TextAlign.center,
+            style: AppStyle.circularTextStyle(
+              size: 17,
+              weight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            url,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: AppStyle.circularTextStyle(
+              size: 12,
+              weight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
       ),
     );
   }

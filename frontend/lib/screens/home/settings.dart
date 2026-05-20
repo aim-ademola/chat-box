@@ -72,9 +72,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         : 'Hey, I am using ChatBox';
     final initials = _initials(displayName);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(color: context.palette.headerBackground),
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: context.palette.headerBackground,
+      body: SafeArea(
         bottom: false,
         child: Column(
           children: [
