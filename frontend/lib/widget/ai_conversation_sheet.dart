@@ -265,7 +265,7 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
 
   Widget _buildPresetButtons(ColorScheme colorScheme) {
     final prompts = [
-      'What should I reply to?',
+      'Write a reply',
       'Any important messages?',
       'Is there a meeting here?',
     ];

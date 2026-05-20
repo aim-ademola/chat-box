@@ -96,14 +96,21 @@ class AiService {
     }
 
     final selectedProvider = _cleanProvider(provider);
+    final isReplyDraftRequest = _asksForReplyDraft(cleanQuestion);
     if (selectedProvider != 'local') {
       final aiAnswer = await _generateText(
         provider: selectedProvider,
-        prompt: _questionPrompt(
-          messages: visibleMessages,
-          currentUserId: currentUserId,
-          question: cleanQuestion,
-        ),
+        prompt: isReplyDraftRequest
+            ? _replyPrompt(
+                messages: visibleMessages,
+                currentUserId: currentUserId,
+                request: cleanQuestion,
+              )
+            : _questionPrompt(
+                messages: visibleMessages,
+                currentUserId: currentUserId,
+                question: cleanQuestion,
+              ),
       );
 
       if (aiAnswer != null && aiAnswer.trim().isNotEmpty) {
@@ -116,6 +123,10 @@ class AiService {
     }
 
     final lowerQuestion = cleanQuestion.toLowerCase();
+    if (isReplyDraftRequest) {
+      return _answer(_localReplyDraft(visibleMessages, currentUserId));
+    }
+
     if (_asksAboutReply(lowerQuestion)) {
       final questions = _openQuestions(visibleMessages, currentUserId);
       if (questions.isEmpty) {
@@ -315,6 +326,23 @@ class AiService {
         question.contains('forgot');
   }
 
+  bool _asksForReplyDraft(String question) {
+    final lower = question.toLowerCase();
+    final wantsReply = lower.contains('reply') ||
+        lower.contains('respond') ||
+        lower.contains('answer') ||
+        lower.contains('message back');
+    final wantsGeneration = lower.contains('generate') ||
+        lower.contains('write') ||
+        lower.contains('draft') ||
+        lower.contains('compose') ||
+        lower.contains('create') ||
+        lower.contains('what should i reply') ||
+        lower.contains('help me reply');
+
+    return wantsReply && wantsGeneration;
+  }
+
   bool _asksAboutMeeting(String question) {
     return question.contains('meeting') ||
         question.contains('meet') ||
@@ -506,6 +534,69 @@ Question: $question
 Conversation:
 ${_conversationText(messages)}
 ''';
+  }
+
+  String _replyPrompt({
+    required List<ChatMessage> messages,
+    required String currentUserId,
+    required String request,
+  }) {
+    return '''
+You are writing a chat reply for the signed-in user.
+The signed-in user id is $currentUserId.
+
+Task:
+- Draft the exact message the signed-in user can send next.
+- Reply to the other person's latest relevant message.
+- Match the chat tone and keep it natural.
+- Do not explain the conversation.
+- Do not include labels like "Draft:" or quotation marks.
+- If the user's request asks for a tone, follow it.
+- If the conversation does not contain enough context, write a brief clarifying reply the user can send.
+
+User request: $request
+
+Conversation:
+${_conversationText(messages)}
+''';
+  }
+
+  String _localReplyDraft(List<ChatMessage> messages, String currentUserId) {
+    ChatMessage? latestIncoming;
+    for (final message in messages.reversed) {
+      final senderId = message.senderId?.trim();
+      final content = (message.content ?? '').trim();
+      if (senderId != null &&
+          senderId.isNotEmpty &&
+          senderId != currentUserId &&
+          content.isNotEmpty) {
+        latestIncoming = message;
+        break;
+      }
+    }
+
+    if (latestIncoming == null) {
+      return 'I will check and get back to you soon.';
+    }
+
+    final content = (latestIncoming.content ?? '').trim();
+    final lower = content.toLowerCase();
+
+    if (content.contains('?')) {
+      return 'Thanks for asking. Let me check and I will get back to you shortly.';
+    }
+
+    if (lower.contains('meeting') ||
+        lower.contains('meet') ||
+        lower.contains('call')) {
+      return 'That works for me. What time is best for you?';
+    }
+
+    if (lower.contains('urgent') || lower.contains('asap')) {
+      return 'Got it. I will look into this now and update you shortly.';
+    }
+
+    return 'Thanks for the update. I will get back to you soon.';
   }
 
   String _conversationText(List<ChatMessage> messages) {
