@@ -10,8 +10,11 @@ import 'package:frontend/screens/home/home_screen.dart';
 import 'package:frontend/screens/home/upload_status.dart';
 import 'package:frontend/screens/onboarding/onboard.dart';
 import 'package:frontend/screens/onboarding/splash.dart';
+import 'package:frontend/services/notification_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initialize();
   runApp(ProviderScope(child: const MyApp()));
 }
 

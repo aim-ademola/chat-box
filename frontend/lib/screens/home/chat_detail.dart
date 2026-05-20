@@ -7,6 +7,7 @@ import 'package:frontend/model/ai_summary_model.dart';
 import 'package:frontend/model/chat_message_model.dart';
 import 'package:frontend/model/message_item_model.dart';
 import 'package:frontend/provider/auth_provider.dart';
+import 'package:frontend/provider/presence_provider.dart';
 import 'package:frontend/repositry/call_repositry.dart';
 import 'package:frontend/repositry/chat_repositry.dart';
 import 'package:frontend/screens/home/active_call_screen.dart';
@@ -196,6 +197,29 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       _scrollToBottom();
     });
 
+    socket.on('chat:read', (dynamic data) {
+      final payload = _asMap(data);
+      final ids = payload['messageIds'] is List
+          ? (payload['messageIds'] as List)
+                .map((item) => item.toString())
+                .toSet()
+          : <String>{};
+      final readAt = payload['readAt']?.toString();
+
+      if (!mounted || ids.isEmpty || readAt == null || readAt.isEmpty) {
+        return;
+      }
+
+      setState(() {
+        for (var i = 0; i < _messages.length; i++) {
+          final message = _messages[i];
+          if (message.id != null && ids.contains(message.id)) {
+            _messages[i] = message.copyWith(readAt: readAt);
+          }
+        }
+      });
+    });
+
     await socket.connect();
   }
 
@@ -372,28 +396,42 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       return 'Unavailable';
     }
 
-    switch (_socketState) {
-      case WebSocketConnectionState.connecting:
-        return 'Connecting...';
-      case WebSocketConnectionState.connected:
-        return widget.contact.userId == null ? 'Demo room' : 'Online';
-      case WebSocketConnectionState.reconnecting:
-        return 'Reconnecting...';
-      case WebSocketConnectionState.disconnected:
-        return 'Offline';
+    if (widget.contact.userId == null) {
+      switch (_socketState) {
+        case WebSocketConnectionState.connecting:
+          return 'Connecting...';
+        case WebSocketConnectionState.connected:
+          return 'Demo room';
+        case WebSocketConnectionState.reconnecting:
+          return 'Reconnecting...';
+        case WebSocketConnectionState.disconnected:
+          return 'Offline';
+      }
     }
+
+    final presence =
+        ref.watch(presenceProvider)[widget.contact.userId] ??
+        parsePresence(null);
+    return presenceLabel(presence);
   }
 
   Color _statusColor(AppThemeColors palette) {
-    switch (_socketState) {
-      case WebSocketConnectionState.connected:
-        return palette.online;
-      case WebSocketConnectionState.connecting:
-      case WebSocketConnectionState.reconnecting:
-        return palette.secondaryText;
-      case WebSocketConnectionState.disconnected:
-        return palette.offline;
+    if (widget.contact.userId == null) {
+      switch (_socketState) {
+        case WebSocketConnectionState.connected:
+          return palette.online;
+        case WebSocketConnectionState.connecting:
+        case WebSocketConnectionState.reconnecting:
+          return palette.secondaryText;
+        case WebSocketConnectionState.disconnected:
+          return palette.offline;
+      }
     }
+
+    final presence =
+        ref.watch(presenceProvider)[widget.contact.userId] ??
+        parsePresence(null);
+    return presenceColor(palette, presence);
   }
 
   Widget _buildHistoryBanner(AppThemeColors palette) {

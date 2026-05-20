@@ -29,13 +29,26 @@ class ChatThreadItemWidget extends StatelessWidget {
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.only(right: 4),
-            child: Text(
-              message.time,
-              style: AppStyle.circularTextStyle(
-                size: 14,
-                weight: FontWeight.w500,
-                color: palette.secondaryText,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  message.time,
+                  style: AppStyle.circularTextStyle(
+                    size: 14,
+                    weight: FontWeight.w500,
+                    color: palette.secondaryText,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  message.isRead ? Icons.done_all_rounded : Icons.done_rounded,
+                  size: 17,
+                  color: message.isRead
+                      ? colorScheme.primary
+                      : palette.secondaryText,
+                ),
+              ],
             ),
           ),
         ],

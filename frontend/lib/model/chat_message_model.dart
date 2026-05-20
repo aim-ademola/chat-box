@@ -16,6 +16,7 @@ class ChatMessageModel {
     this.senderName,
     this.senderProfilePicUrl,
     this.sentAt,
+    this.readAt,
   });
 
   final String? id;
@@ -32,6 +33,9 @@ class ChatMessageModel {
   final String? senderName;
   final String? senderProfilePicUrl;
   final String? sentAt;
+  final String? readAt;
+
+  bool get isRead => readAt != null && readAt!.trim().isNotEmpty;
 
   ChatMessageModel copyWith({
     String? id,
@@ -48,6 +52,7 @@ class ChatMessageModel {
     String? senderName,
     String? senderProfilePicUrl,
     String? sentAt,
+    String? readAt,
   }) {
     return ChatMessageModel(
       id: id ?? this.id,
@@ -64,6 +69,7 @@ class ChatMessageModel {
       senderName: senderName ?? this.senderName,
       senderProfilePicUrl: senderProfilePicUrl ?? this.senderProfilePicUrl,
       sentAt: sentAt ?? this.sentAt,
+      readAt: readAt ?? this.readAt,
     );
   }
 
@@ -80,6 +86,7 @@ class ChatMessageModel {
         map['sentAt']?.toString() ??
         map['createdAt']?.toString() ??
         map['created_at']?.toString();
+    final readAt = map['readAt']?.toString() ?? map['read_at']?.toString();
     final type = _parseType(map['messageType'] ?? map['type']);
     final senderName =
         sender['name']?.toString() ?? map['senderName']?.toString();
@@ -101,6 +108,7 @@ class ChatMessageModel {
       senderName: senderName,
       senderProfilePicUrl: senderProfilePicUrl,
       sentAt: sentAt,
+      readAt: readAt,
     );
   }
 
@@ -120,6 +128,7 @@ class ChatMessageModel {
       'senderName': senderName,
       'senderProfilePicUrl': senderProfilePicUrl,
       'sentAt': sentAt,
+      'readAt': readAt,
     };
   }
 
