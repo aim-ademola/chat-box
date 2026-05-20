@@ -63,12 +63,10 @@ class AuthProvider extends AsyncNotifier<UserModel?> {
   }
 
   Future logout() async {
-    print("Hello");
     final repo = ref.read(authRepositryProvider);
     state = AsyncValue.loading();
-    print("object");
-    repo.logout();
-    state = AsyncData(null);
+    await repo.logout();
+    state = const AsyncData(null);
   }
 }
 

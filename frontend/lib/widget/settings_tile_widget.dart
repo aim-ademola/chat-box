@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/core/constant/app_colors.dart';
+import 'package:frontend/widget/image_widget.dart';
 import 'package:frontend/model/settings_item_model.dart';
 
 class SettingsTileWidget extends StatelessWidget {
@@ -23,15 +23,11 @@ class SettingsTileWidget extends StatelessWidget {
                   height: 50,
                   width: 50,
                   decoration: BoxDecoration(
-                    color: Colors.lightBlueAccent.withOpacity(0.1),
+                    color: Colors.lightBlueAccent.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: SvgPicture.asset(
-                      item.imagePath,
-                      width: 26,
-                      height: 26,
-                    ),
+                    child: ImageWidget(item.imagePath, width: 26, height: 26),
                   ),
                 ),
                 SizedBox(width: 16),

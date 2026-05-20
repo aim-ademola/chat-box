@@ -8,6 +8,7 @@ import 'package:frontend/model/message_item_model.dart';
 import 'package:frontend/model/user_model.dart';
 import 'package:frontend/provider/contacts_provider.dart';
 import 'package:frontend/screens/home/chat_detail.dart';
+import 'package:frontend/screens/home/user_profile_screen.dart';
 import 'package:frontend/widget/circle_icon_button_widget.dart';
 import 'package:frontend/widget/contact_tile_widget.dart';
 
@@ -81,6 +82,13 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ChatDetailScreen(contact: message)),
+    );
+  }
+
+  Future<void> _openUserProfile(UserModel user) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => UserProfileScreen(user: user)),
     );
   }
 
@@ -159,6 +167,9 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                       child: contactsState.when(
                         data: (users) {
                           final groupedContacts = _groupContacts(users);
+                          final usersById = {
+                            for (final user in users) user.id: user,
+                          };
                           return ListView(
                             padding: const EdgeInsets.fromLTRB(24, 22, 24, 34),
                             children: [
@@ -188,7 +199,16 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                                 ) ...[
                                   ContactTileWidget(
                                     contact: entry.value[i],
-                                    onTap: () => _openChat(entry.value[i]),
+                                    onTap: () {
+                                      final contact = entry.value[i];
+                                      final user = usersById[contact.userId];
+                                      if (user == null) {
+                                        _openChat(contact);
+                                        return;
+                                      }
+
+                                      _openUserProfile(user);
+                                    },
                                   ),
                                   if (i != entry.value.length - 1)
                                     const SizedBox(height: 30),

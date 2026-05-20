@@ -17,13 +17,13 @@ class AppImages {
   static const String notification = '$_imagePath/notification.png';
 
   static const String user = '$_imagePath/user.svg';
-  static const String users = '$_imagePath/users.svg';
-  static const String help = '$_imagePath/help.svg';
-  static const String keys = '$_imagePath/keys.svg';
-  static const String data = '$_imagePath/data.svg';
-  static const String messages = '$_imagePath/messages.svg';
-  static const String notificationss = '$_imagePath/notificationss.svg';
-  static const String video = '$_imagePath/video.svg';
-  static const String calls = '$_imagePath/calls.svg';
-  static const String missedCall = '$_imagePath/missedCall.svg';
+  static const String users = user;
+  static const String help = settings;
+  static const String keys = settings;
+  static const String data = trash;
+  static const String messages = homeMessage;
+  static const String notificationss = notification;
+  static const String video = call;
+  static const String calls = call;
+  static const String missedCall = call;
 }

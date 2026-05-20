@@ -63,6 +63,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     var authUser = ref.watch(authProvider);
+    final user = authUser.value;
+    final displayName = user?.name.trim().isNotEmpty == true
+        ? user!.name.trim()
+        : 'ChatBox User';
+    final bio = user?.bio.trim().isNotEmpty == true
+        ? user!.bio.trim()
+        : 'Hey, I am using ChatBox';
+    final initials = _initials(displayName);
+
     return Scaffold(
       backgroundColor: AppColors.black,
       body: SafeArea(
@@ -107,43 +116,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         const SizedBox(width: 10),
                         ProfileAvatarWidget(
-                          initials: 'NI',
+                          initials: initials,
                           backgroundColor: Color(0xFFC8C5F7),
                           radius: 28,
-                          profilePicUrl: "",
+                          profilePicUrl: user?.profilePicUrl ?? "",
                         ),
                         const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => Profile(),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => Profile(),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  authUser.isLoading
+                                      ? 'Loading...'
+                                      : displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppStyle.circularMediumStyle.copyWith(
+                                    fontSize: 16,
+                                    color: AppColors.black,
                                   ),
-                                );
-                              },
-                              child: Text(
-                                "Nazrul Islam",
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                bio,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: AppStyle.circularMediumStyle.copyWith(
-                                  fontSize: 25,
+                                  fontSize: 13,
                                   color: AppColors.black,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              "Never give up",
-                              style: AppStyle.circularMediumStyle.copyWith(
-                                fontSize: 15,
-                                color: AppColors.black,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        const Spacer(),
                         const Icon(Icons.qr_code),
                       ],
                     ),
@@ -163,16 +179,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       label: authUser.isLoading
                           ? "logging out....."
                           : "Log Out",
-                      onTap: () {
-                        ref.watch(authProvider.notifier).logout();
+                      onTap: () async {
+                        await ref.read(authProvider.notifier).logout();
 
-                        if (authUser.value == null) {
-                          Navigator.pushNamedAndRemoveUntil(
-                            context,
-                            "login",
-                            (_) => false,
-                          );
-                        }
+                        if (!context.mounted) return;
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          "login",
+                          (_) => false,
+                        );
                       },
                     ),
                   ],
@@ -183,5 +198,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .toList();
+
+    final value = parts.map((part) => part[0].toUpperCase()).join();
+    return value.isEmpty ? 'U' : value;
   }
 }

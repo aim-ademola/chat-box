@@ -10,13 +10,9 @@ class SplashProvider {
     await Future.delayed(const Duration(seconds: 1));
 
     try {
-      print("getInitialRoute");
       final user = await ref.read(authProvider.future);
-      print("this is user $user");
       return user == null ? 'onboarding' : 'home';
-    } catch (error) {
-      print("this is error $error");
-
+    } catch (_) {
       return 'onboarding';
     }
   }

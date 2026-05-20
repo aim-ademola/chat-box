@@ -12,106 +12,121 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
+    final isShortScreen = screenSize.height < 700;
+    final heroFontSize = isShortScreen ? 34.0 : 46.0;
+
     return Scaffold(
       backgroundColor: AppColors.black,
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      body: SafeArea(
         child: Stack(
           children: [
-            Positioned(
-              width: MediaQuery.sizeOf(context).width,
-              right: 0,
+            Positioned.fill(
               child: ImageWidget(fit: BoxFit.cover, AppImages.onboardBg),
             ),
-
-            SizedBox(
-              width: MediaQuery.sizeOf(context).width,
-
-              child: Column(
-                spacing: 10,
-                crossAxisAlignment: .start,
-                children: [
-                  SizedBox(height: 50),
-                  Row(
-                    crossAxisAlignment: .center,
-                    mainAxisAlignment: .center,
-                    spacing: 10,
-                    children: [
-                      ImageWidget(
-                        AppImages.logo,
-                        width: 25,
-                        color: AppColors.white,
-                      ),
-                      Text(
-                        'ChatBox',
-                        style: AppStyle.circularMediumStyle.copyWith(
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight:
+                      screenSize.height -
+                      MediaQuery.paddingOf(context).top -
+                      MediaQuery.paddingOf(context).bottom,
+                ),
+                child: Column(
+                  spacing: isShortScreen ? 8 : 10,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: isShortScreen ? 18 : 42),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      spacing: 10,
+                      children: [
+                        ImageWidget(
+                          AppImages.logo,
+                          width: 25,
                           color: AppColors.white,
                         ),
-                      ),
-                    ],
-                  ),
-
-                  ///// Onboarding Text
-                  ///
-                  ///
-                  Text(
-                    'Connect friends ',
-                    style: AppStyle.carosLargeStyle.copyWith(
-                      fontWeight: FontWeight(500),
+                        Text(
+                          'ChatBox',
+                          style: AppStyle.circularMediumStyle.copyWith(
+                            color: AppColors.white,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Text('easily & quickly', style: AppStyle.carosLargeStyle),
 
-                  Text(
-                    'Our chat app is the perfect way to stay \nconnected with friends and family.',
-                    textAlign: .start,
-
-                    style: AppStyle.circularSmallStyle,
-                  ),
-
-                  SizedBox(height: 20),
-
-                  Row(
-                    spacing: 12,
-                    mainAxisAlignment: .center,
-                    children: [
-                      SocialBotton(iconPath: AppImages.facebook),
-                      SocialBotton(iconPath: AppImages.google),
-                      SocialBotton(iconPath: AppImages.apple),
-                    ],
-                  ),
-                  SizedBox(height: 20),
-                  OrDivideWidget(),
-                  SizedBox(height: 10),
-                  AppButton(
-                    textColor: AppColors.black,
-                    label: 'Sign up withn mail',
-                    backgroundColor: AppColors.white,
-                    onTap: () {
-                      Navigator.pushNamed(context, 'register');
-                    },
-                  ),
-                  SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: .center,
-                    children: [
-                      Text(
-                        'Existing account? ',
-                        style: AppStyle.circularSmallStyle,
+                    SizedBox(height: isShortScreen ? 18 : 30),
+                    Text(
+                      'Connect friends',
+                      style: AppStyle.carosLargeStyle.copyWith(
+                        fontSize: heroFontSize,
+                        height: 1.12,
+                        fontWeight: FontWeight.w500,
                       ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pushNamed(context, 'login');
-                        },
+                    ),
+                    Text(
+                      'easily & quickly',
+                      style: AppStyle.carosLargeStyle.copyWith(
+                        fontSize: heroFontSize,
+                        height: 1.12,
+                      ),
+                    ),
 
-                        child: Text(
-                          ' Log in',
+                    Text(
+                      'Our chat app is the perfect way to stay connected with friends and family.',
+                      textAlign: TextAlign.start,
+                      style: AppStyle.circularSmallStyle.copyWith(
+                        fontSize: 14,
+                        height: 1.35,
+                      ),
+                    ),
+
+                    SizedBox(height: isShortScreen ? 8 : 18),
+                    Row(
+                      spacing: 12,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SocialBotton(iconPath: AppImages.facebook),
+                        SocialBotton(iconPath: AppImages.google),
+                        SocialBotton(iconPath: AppImages.apple),
+                      ],
+                    ),
+                    SizedBox(height: isShortScreen ? 8 : 16),
+                    OrDivideWidget(),
+                    SizedBox(height: isShortScreen ? 4 : 8),
+                    AppButton(
+                      textColor: AppColors.black,
+                      label: 'Sign up with mail',
+                      backgroundColor: AppColors.white,
+                      onTap: () {
+                        Navigator.pushNamed(context, 'register');
+                      },
+                    ),
+                    SizedBox(height: isShortScreen ? 6 : 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Existing account? ',
                           style: AppStyle.circularSmallStyle,
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pushNamed(context, 'login');
+                          },
+                          child: Text(
+                            ' Log in',
+                            style: AppStyle.circularSmallStyle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                  ],
+                ),
               ),
             ),
           ],

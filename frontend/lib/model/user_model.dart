@@ -43,11 +43,11 @@ class UserModel {
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
-      id: map['id'],
-      name: map['name'],
-      email: map['email'],
-      bio: map['bio'],
-      profilePicUrl: map['profilePicUrl'],
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? 'ChatBox User',
+      email: map['email']?.toString() ?? '',
+      bio: map['bio']?.toString() ?? 'Hey, I am using ChatBox',
+      profilePicUrl: map['profilePicUrl']?.toString() ?? '',
     );
   }
 
