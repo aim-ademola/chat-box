@@ -113,9 +113,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     _socket?.on('call:incoming', _handleIncomingCall);
-    _socket?.on('call:ended', (_) => ref.invalidate(recentCallsProvider));
-    _socket?.on('call:rejected', (_) => ref.invalidate(recentCallsProvider));
-    _socket?.on('call:accepted', (_) => ref.invalidate(recentCallsProvider));
+    _socket?.on('call:ended', (_) {
+      NotificationService.cancelIncomingCalls();
+      ref.invalidate(recentCallsProvider);
+    });
+    _socket?.on('call:rejected', (_) {
+      NotificationService.cancelIncomingCalls();
+      ref.invalidate(recentCallsProvider);
+    });
+    _socket?.on('call:accepted', (_) {
+      NotificationService.cancelIncomingCalls();
+      ref.invalidate(recentCallsProvider);
+    });
 
     await _socket?.connect();
   }
@@ -203,6 +212,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     _showingIncomingCall = true;
     ref.invalidate(recentCallsProvider);
+    await NotificationService.showIncomingCall(
+      callId: call.id,
+      callerName: call.peerName,
+      isVideoCall: call.isVideoCall,
+    );
 
     await Navigator.push(
       context,
@@ -212,6 +226,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
 
+    await NotificationService.cancelIncomingCall(call.id);
     _showingIncomingCall = false;
   }
 
