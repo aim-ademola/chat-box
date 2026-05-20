@@ -69,10 +69,10 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => StatusPreviewScreen(
-          userName: story.name,
-          userInitials: story.initials,
-          userProfilePicUrl: story.profilePicUrl ?? '',
-          statuses: story.statuses ?? [],
+          userName: statuses.first.name,
+          userInitials: statuses.first.initials,
+          userProfilePicUrl: statuses.first.profilePicUrl ?? '',
+          statuses: statuses.first.statuses ?? [],
         ),
       ),
     );

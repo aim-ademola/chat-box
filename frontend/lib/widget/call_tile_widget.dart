@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/core/constant/app_colors.dart';
 import 'package:frontend/core/constant/app_images.dart';
 import 'package:frontend/core/constant/app_style.dart';
+import 'package:frontend/core/theme/theme.dart';
 import 'package:frontend/model/call_item_model.dart';
 import 'package:frontend/widget/image_widget.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
@@ -24,6 +24,9 @@ class CallTileWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -50,7 +53,7 @@ class CallTileWidget extends StatelessWidget {
                       contact.name,
                       style: AppStyle.circularMediumStyle.copyWith(
                         fontSize: 20,
-                        color: AppColors.black,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -58,14 +61,16 @@ class CallTileWidget extends StatelessWidget {
                       children: [
                         ImageWidget(
                           isMissed ? AppImages.missedCall : AppImages.calls,
-                          color: isMissed ? Colors.red : AppColors.primary,
+                          color: isMissed
+                              ? colorScheme.error
+                              : colorScheme.primary,
                         ),
                         const SizedBox(width: 5),
                         Text(
                           callTime,
                           style: AppStyle.circularMediumStyle.copyWith(
                             fontSize: 15,
-                            color: AppColors.grey,
+                            color: palette.secondaryText,
                           ),
                         ),
                       ],
@@ -76,9 +81,9 @@ class CallTileWidget extends StatelessWidget {
 
               Row(
                 children: [
-                  ImageWidget(AppImages.call, color: AppColors.grey),
-                  SizedBox(width: 12),
-                  ImageWidget(AppImages.video, color: AppColors.grey),
+                  ImageWidget(AppImages.call, color: palette.inactiveIcon),
+                  const SizedBox(width: 12),
+                  ImageWidget(AppImages.video, color: palette.inactiveIcon),
                 ],
               ),
             ],

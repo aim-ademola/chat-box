@@ -128,15 +128,18 @@ class _StatusPreviewScreenState extends ConsumerState<StatusPreviewScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (status.url != null && status.url!.isNotEmpty) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(28),
-                              child: Image.network(
-                                status.url ?? "",
-                                height: 260,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
+                            if (status.type == 'video')
+                              _VideoStatusTile(url: status.url!)
+                            else
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(28),
+                                child: Image.network(
+                                  status.url ?? "",
+                                  height: 260,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
                               ),
-                            ),
                             const SizedBox(height: 24),
                           ],
                           Text(
@@ -158,6 +161,59 @@ class _StatusPreviewScreenState extends ConsumerState<StatusPreviewScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VideoStatusTile extends StatelessWidget {
+  const _VideoStatusTile({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 260,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.play_circle_outline_rounded,
+            color: Colors.white,
+            size: 62,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Video status',
+            style: AppStyle.circularTextStyle(
+              size: 18,
+              weight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              url,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppStyle.circularTextStyle(
+                size: 12,
+                weight: FontWeight.w500,
+                color: Colors.white.withValues(alpha: 0.72),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

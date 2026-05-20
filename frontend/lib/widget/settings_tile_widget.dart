@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/core/constant/app_style.dart';
-import 'package:frontend/core/constant/app_colors.dart';
+import 'package:frontend/core/theme/theme.dart';
 import 'package:frontend/widget/image_widget.dart';
 import 'package:frontend/model/settings_item_model.dart';
 
@@ -11,6 +11,9 @@ class SettingsTileWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
+
     return InkWell(
       onTap: item.isEnabled ? item.onTap : null,
       child: Padding(
@@ -23,11 +26,18 @@ class SettingsTileWidget extends StatelessWidget {
                   height: 50,
                   width: 50,
                   decoration: BoxDecoration(
-                    color: Colors.lightBlueAccent.withValues(alpha: 0.1),
+                    color: colorScheme.primary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: ImageWidget(item.imagePath, width: 26, height: 26),
+                    child: ImageWidget(
+                      item.imagePath,
+                      width: 26,
+                      height: 26,
+                      color: item.imagePath.endsWith('.svg')
+                          ? colorScheme.primary
+                          : null,
+                    ),
                   ),
                 ),
                 SizedBox(width: 16),
@@ -39,7 +49,9 @@ class SettingsTileWidget extends StatelessWidget {
                         item.title,
                         style: AppStyle.circularMediumStyle.copyWith(
                           fontSize: 18,
-                          color: item.isEnabled ? AppColors.black : Colors.grey,
+                          color: item.isEnabled
+                              ? colorScheme.onSurface
+                              : palette.inactiveIcon,
                         ),
                       ),
                       if (item.subtitle != null) const SizedBox(height: 3),
@@ -49,8 +61,8 @@ class SettingsTileWidget extends StatelessWidget {
                           style: AppStyle.circularMediumStyle.copyWith(
                             fontSize: 14,
                             color: item.isEnabled
-                                ? Colors.black54
-                                : Colors.grey,
+                                ? palette.secondaryText
+                                : palette.inactiveIcon,
                           ),
                         ),
                     ],

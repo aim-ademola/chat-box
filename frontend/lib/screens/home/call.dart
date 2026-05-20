@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/core/constant/app_colors.dart';
 import 'package:frontend/core/constant/app_images.dart';
 import 'package:frontend/core/constant/app_style.dart';
+import 'package:frontend/core/extention/build_context_ext.dart';
+import 'package:frontend/core/theme/theme.dart';
 import 'package:frontend/provider/call_provider.dart';
 import 'package:frontend/widget/call_tile_widget.dart';
 import 'package:frontend/widget/circle_icon_button_widget.dart';
@@ -17,12 +18,14 @@ class CallScreen extends ConsumerStatefulWidget {
 class _CallScreenState extends ConsumerState<CallScreen> {
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
     final calls = ref.watch(recentCallsProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.black,
-
-      body: SafeArea(
+    return DecoratedBox(
+      decoration: BoxDecoration(color: palette.headerBackground),
+      child: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             const SizedBox(height: 20),
@@ -33,7 +36,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                 children: [
                   CircleIconButtonWidget(
                     icon: AppImages.search,
-                    borderColor: AppColors.white,
+                    borderColor: palette.searchBorder,
                   ),
 
                   Expanded(
@@ -42,7 +45,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                         "Calls",
                         style: AppStyle.circularSmallStyle.copyWith(
                           fontSize: 16,
-                          color: AppColors.white,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -53,7 +56,10 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                     height: 50,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.white, width: 1.5),
+                      border: Border.all(
+                        color: palette.searchBorder,
+                        width: 1.5,
+                      ),
                     ),
                     child: const Icon(
                       Icons.add_call,
@@ -70,13 +76,32 @@ class _CallScreenState extends ConsumerState<CallScreen> {
             Expanded(
               child: Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(38)),
+                decoration: BoxDecoration(
+                  color: palette.messageSheet,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(38),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: context.isDarkMode ? 0.18 : 0.08,
+                      ),
+                      blurRadius: 28,
+                      offset: const Offset(0, -8),
+                    ),
+                  ],
                 ),
                 child: Column(
                   children: [
-                    const SizedBox(height: 20),
+                    Container(
+                      margin: const EdgeInsets.only(top: 14, bottom: 8),
+                      width: 76,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: palette.handle,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
 
                     Padding(
                       padding: const EdgeInsets.symmetric(
@@ -89,6 +114,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                           "Recent",
                           style: AppStyle.circularMediumStyle.copyWith(
                             fontSize: 18,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -104,7 +130,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                               child: Text(
                                 'No recent calls',
                                 style: AppStyle.circularMediumStyle.copyWith(
-                                  color: AppColors.grey,
+                                  color: palette.secondaryText,
                                   fontSize: 16,
                                 ),
                               ),
@@ -120,10 +146,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                                 horizontal: 20,
                               ),
                               itemCount: items.length,
-                              separatorBuilder: (_, _) => Divider(
-                                color: Colors.grey.shade200,
-                                indent: 70,
-                              ),
+                              separatorBuilder: (_, _) =>
+                                  Divider(color: palette.handle, indent: 70),
                               itemBuilder: (context, index) {
                                 final call = items[index];
 

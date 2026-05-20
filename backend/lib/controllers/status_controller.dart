@@ -95,15 +95,18 @@ class StatusController {
       return res.status(401).json({'status': false, 'message': 'Unauthorized'});
     }
 
+    final hasUpload = await ctx.req.hasFile('file');
     String? url;
-    if (await ctx.req.hasFile('file')) {
+    if (hasUpload) {
       final file = await ctx.req.file('file');
       if (file != null) {
         url = await Storage.create(file, subdirectory: 'status');
       }
     }
 
-    final createForm = await ctx.req.json();
+    final Map<String, dynamic> createForm = hasUpload
+        ? Map<String, dynamic>.from(await ctx.req.form())
+        : await ctx.req.json();
 
     print(createForm);
     final content = (createForm['content'] ?? '').toString().trim();

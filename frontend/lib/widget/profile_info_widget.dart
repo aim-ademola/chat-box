@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/core/constant/app_style.dart';
-import 'package:frontend/core/constant/app_colors.dart';
+import 'package:frontend/core/theme/theme.dart';
 
 class ProfileInfoTileWidget extends StatelessWidget {
   final String title;
@@ -18,6 +18,9 @@ class ProfileInfoTileWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
+
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -45,7 +48,7 @@ class ProfileInfoTileWidget extends StatelessWidget {
                     title,
                     style: AppStyle.circularMediumStyle.copyWith(
                       fontSize: 14,
-                      color: Colors.grey,
+                      color: palette.secondaryText,
                     ),
                   ),
 
@@ -55,7 +58,7 @@ class ProfileInfoTileWidget extends StatelessWidget {
                     value,
                     style: AppStyle.carosBoldStyle(
                       context,
-                    ).copyWith(fontSize: 18, color: AppColors.black),
+                    ).copyWith(fontSize: 18, color: colorScheme.onSurface),
                   ),
                 ],
               ),
