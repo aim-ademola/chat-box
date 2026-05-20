@@ -707,7 +707,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                         Text(
                           widget.contact.name,
                           style: AppStyle.circularTextStyle(
-                            size: 24,
+                            size: 16,
                             weight: FontWeight.w700,
                             color: colorScheme.onSurface,
                           ),

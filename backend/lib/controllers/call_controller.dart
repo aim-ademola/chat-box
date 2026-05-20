@@ -4,6 +4,8 @@ import 'package:backend/models/user_model.dart';
 import 'package:backend/services/agora_token_service.dart';
 import 'package:flint_dart/flint_dart.dart';
 
+const String _userSocketPath = '/chat/connect';
+
 class CallController {
   CallController({AgoraTokenService? tokenService})
       : _tokenService = tokenService ?? AgoraTokenService();
@@ -80,10 +82,14 @@ class CallController {
       channelName: channelName,
       uid: callerUid,
     );
-    final payload = _callPayload(call, currentUserId: user.id);
+    final payload = await _callPayload(call, currentUserId: user.id);
+    final recipientPayload = await _callPayload(
+      call,
+      currentUserId: recipientId,
+    );
 
-    WebSocketManager().emit(_userRoom(recipientId), 'call:incoming', {
-      'call': _callPayload(call, currentUserId: recipientId),
+    _emitToUser(recipientId, 'call:incoming', {
+      'call': recipientPayload,
       'caller': _userPayload(user),
     });
 
@@ -140,9 +146,9 @@ class CallController {
 
     return res.json({
       'status': true,
-      'data': calls
-          .map((call) => _callPayload(call, currentUserId: user.id))
-          .toList(),
+      'data': await Future.wait(
+        calls.map((call) => _callPayload(call, currentUserId: user.id)),
+      ),
     });
   }
 
@@ -168,7 +174,7 @@ class CallController {
 
     return res.json({
       'status': true,
-      'data': _callPayload(call, currentUserId: user.id),
+      'data': await _callPayload(call, currentUserId: user.id),
     });
   }
 
@@ -254,12 +260,16 @@ class CallController {
         .withRelation('recipient')
         .find(call.id);
     final updatedCall = stored ?? call;
-    final payload = _callPayload(updatedCall, currentUserId: user.id);
+    final payload = await _callPayload(updatedCall, currentUserId: user.id);
     final otherUserId =
         call.callerId == user.id ? call.recipientId : call.callerId;
+    final otherPayload = await _callPayload(
+      updatedCall,
+      currentUserId: otherUserId,
+    );
 
-    WebSocketManager().emit(_userRoom(otherUserId), 'call:$status', {
-      'call': _callPayload(updatedCall, currentUserId: otherUserId),
+    _emitToUser(otherUserId, 'call:$status', {
+      'call': otherPayload,
     });
 
     final uid = _uidForCall(call, user.id);
@@ -291,11 +301,13 @@ class CallController {
         .find(callId.trim());
   }
 
-  Map<String, dynamic> _callPayload(Call call,
-      {required String currentUserId}) {
-    final peer = call.callerId == currentUserId ? call.recipient : call.caller;
+  Future<Map<String, dynamic>> _callPayload(Call call,
+      {required String currentUserId}) async {
+    final relatedPeer =
+        call.callerId == currentUserId ? call.recipient : call.caller;
     final peerId =
         call.callerId == currentUserId ? call.recipientId : call.callerId;
+    final peer = await _peerForPayload(relatedPeer, peerId);
 
     return {
       'id': call.id?.toString(),
@@ -366,5 +378,27 @@ class CallController {
     return 'User $peerId';
   }
 
+  Future<User?> _peerForPayload(User? relatedPeer, String peerId) async {
+    final relatedName = relatedPeer?.name.trim();
+    if (relatedName != null && relatedName.isNotEmpty) {
+      return relatedPeer;
+    }
+
+    if (peerId.trim().isEmpty) {
+      return relatedPeer;
+    }
+
+    return await User().find(peerId.trim()) ?? relatedPeer;
+  }
+
   String _userRoom(String userId) => 'user:$userId';
+
+  void _emitToUser(String userId, String event, Map<String, dynamic> data) {
+    WebSocketManager().emitToPathRoom(
+      _userSocketPath,
+      _userRoom(userId),
+      event,
+      data,
+    );
+  }
 }

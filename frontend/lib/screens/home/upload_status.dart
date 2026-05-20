@@ -95,7 +95,7 @@ class _UploadStatusScreenState extends ConsumerState<UploadStatusScreen> {
                         'Upload Status',
                         textAlign: TextAlign.center,
                         style: AppStyle.circularTextStyle(
-                          size: 26,
+                          size: 16,
                           weight: FontWeight.w700,
                           color: Colors.white,
                         ),

@@ -41,7 +41,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                       child: Text(
                         "Calls",
                         style: AppStyle.circularSmallStyle.copyWith(
-                          fontSize: 20,
+                          fontSize: 16,
                           color: AppColors.white,
                         ),
                       ),

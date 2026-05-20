@@ -12,11 +12,13 @@ class AiRepositry {
 
   Future<AiSummaryModel> getChatSummary({
     required String conversationId,
+    required String provider,
   }) async {
     final headers = await authRepository.authHeaders();
     final res = await client.get(
       '/ai/chats/$conversationId/summary',
       headers: headers,
+      queryParameters: {'provider': provider},
       cacheConfig: CacheConfig(maxAge: Duration.zero),
     );
     res.throwIfError();
@@ -33,12 +35,13 @@ class AiRepositry {
   Future<String> askChat({
     required String conversationId,
     required String question,
+    required String provider,
   }) async {
     final headers = await authRepository.authHeaders();
     final res = await client.post(
       '/ai/chats/$conversationId/ask',
       headers: headers,
-      body: {'question': question},
+      body: {'question': question, 'provider': provider},
     );
     res.throwIfError();
 

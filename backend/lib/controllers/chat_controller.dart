@@ -4,6 +4,8 @@ import 'package:backend/models/chat_message.dart';
 import 'package:backend/models/user_model.dart';
 import 'package:flint_dart/flint_dart.dart';
 
+const String _userSocketPath = '/chat/connect';
+
 class ChatController {
   Future<Response?> history(Context ctx) async {
     final res = ctx.res;
@@ -242,18 +244,10 @@ class ChatController {
         'message': storedMap,
       };
 
-      WebSocketManager().emit(
-        _userRoom(cleanedCurrentUserId),
-        'messageReceived',
-        notificationPayload,
-      );
+      _emitToUser(cleanedCurrentUserId, 'messageReceived', notificationPayload);
 
       if (recipientId != null && recipientId.trim().isNotEmpty) {
-        WebSocketManager().emit(
-          _userRoom(recipientId.trim()),
-          'messageReceived',
-          notificationPayload,
-        );
+        _emitToUser(recipientId.trim(), 'messageReceived', notificationPayload);
       }
     });
 
@@ -277,6 +271,15 @@ class ChatController {
   }
 
   String _userRoom(String userId) => 'user:$userId';
+
+  void _emitToUser(String userId, String event, Map<String, dynamic> data) {
+    WebSocketManager().emitToPathRoom(
+      _userSocketPath,
+      _userRoom(userId),
+      event,
+      data,
+    );
+  }
 
   String? _conversationIdFor(String userId, String? friendId) {
     final cleanedUserId = userId.trim();

@@ -1,10 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:backend/models/chat_message.dart';
+import 'package:flint_dart/flint_dart.dart';
 
 class AiService {
-  Map<String, dynamic> summarizeChat({
+  Future<Map<String, dynamic>> summarizeChat({
     required List<ChatMessage> messages,
     required String currentUserId,
-  }) {
+    String? provider,
+  }) async {
     final generatedAt = DateTime.now().toIso8601String();
 
     if (messages.isEmpty) {
@@ -19,6 +24,7 @@ class AiService {
       };
     }
 
+    final selectedProvider = _cleanProvider(provider);
     final visibleMessages = messages
         .where((message) => (message.content ?? '').trim().isNotEmpty)
         .toList();
@@ -28,9 +34,30 @@ class AiService {
     final openQuestions = _openQuestions(visibleMessages, currentUserId);
     final importantMessages = _importantMessages(visibleMessages);
     final meetingSuggestions = _meetingSuggestions(visibleMessages);
+    final localSummary = _summaryText(visibleMessages);
+
+    if (selectedProvider != 'local') {
+      final aiSummary = await _generateText(
+        provider: selectedProvider,
+        prompt: _summaryPrompt(visibleMessages),
+      );
+
+      if (aiSummary != null && aiSummary.trim().isNotEmpty) {
+        return {
+          'summary': aiSummary.trim(),
+          'messageCount': messages.length,
+          'openQuestions': openQuestions,
+          'importantMessages': importantMessages,
+          'meetingSuggestions': meetingSuggestions,
+          'latestMessages': latestMessages.map(_messagePreview).toList(),
+          'generatedAt': generatedAt,
+          'source': selectedProvider,
+        };
+      }
+    }
 
     return {
-      'summary': _summaryText(visibleMessages),
+      'summary': localSummary,
       'messageCount': messages.length,
       'openQuestions': openQuestions,
       'importantMessages': importantMessages,
@@ -41,11 +68,12 @@ class AiService {
     };
   }
 
-  Map<String, dynamic> answerChatQuestion({
+  Future<Map<String, dynamic>> answerChatQuestion({
     required List<ChatMessage> messages,
     required String currentUserId,
     required String question,
-  }) {
+    String? provider,
+  }) async {
     final cleanQuestion = question.trim();
     final visibleMessages = messages
         .where((message) => (message.content ?? '').trim().isNotEmpty)
@@ -65,6 +93,26 @@ class AiService {
         'generatedAt': DateTime.now().toIso8601String(),
         'source': 'local',
       };
+    }
+
+    final selectedProvider = _cleanProvider(provider);
+    if (selectedProvider != 'local') {
+      final aiAnswer = await _generateText(
+        provider: selectedProvider,
+        prompt: _questionPrompt(
+          messages: visibleMessages,
+          currentUserId: currentUserId,
+          question: cleanQuestion,
+        ),
+      );
+
+      if (aiAnswer != null && aiAnswer.trim().isNotEmpty) {
+        return {
+          'answer': aiAnswer.trim(),
+          'generatedAt': DateTime.now().toIso8601String(),
+          'source': selectedProvider,
+        };
+      }
     }
 
     final lowerQuestion = cleanQuestion.toLowerCase();
@@ -288,5 +336,188 @@ class AiService {
       'generatedAt': DateTime.now().toIso8601String(),
       'source': 'local',
     };
+  }
+
+  String _cleanProvider(String? provider) {
+    final requested =
+        (provider ?? FlintEnv.get('AI_PROVIDER', 'local')).trim().toLowerCase();
+
+    if (requested == 'gemini' || requested == 'openai') {
+      return requested;
+    }
+
+    return 'local';
+  }
+
+  Future<String?> _generateText({
+    required String provider,
+    required String prompt,
+  }) async {
+    try {
+      switch (provider) {
+        case 'gemini':
+          return await _generateGemini(prompt);
+        case 'openai':
+          return await _generateOpenAi(prompt);
+      }
+    } catch (_) {
+      return null;
+    }
+
+    return null;
+  }
+
+  Future<String?> _generateGemini(String prompt) async {
+    final apiKey = FlintEnv.get('GEMINI_API_KEY', '').trim();
+    if (apiKey.isEmpty) return null;
+
+    final model = FlintEnv.get('GEMINI_MODEL', 'gemini-2.5-flash').trim();
+    final uri = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent',
+    );
+
+    final response = await _postJson(
+      uri,
+      headers: {'x-goog-api-key': apiKey},
+      body: {
+        'contents': [
+          {
+            'role': 'user',
+            'parts': [
+              {'text': prompt},
+            ],
+          },
+        ],
+        'generationConfig': {
+          'temperature': 0.3,
+          'maxOutputTokens': 700,
+        },
+      },
+    );
+
+    final candidates = response['candidates'];
+    if (candidates is! List || candidates.isEmpty) return null;
+
+    final content = candidates.first is Map
+        ? Map<String, dynamic>.from(candidates.first as Map)['content']
+        : null;
+    final parts = content is Map ? content['parts'] : null;
+    if (parts is! List) return null;
+
+    return parts
+        .whereType<Map>()
+        .map((part) => part['text']?.toString() ?? '')
+        .where((text) => text.trim().isNotEmpty)
+        .join('\n')
+        .trim();
+  }
+
+  Future<String?> _generateOpenAi(String prompt) async {
+    final apiKey = FlintEnv.get('OPENAI_API_KEY', '').trim();
+    if (apiKey.isEmpty) return null;
+
+    final model = FlintEnv.get('OPENAI_MODEL', 'gpt-4.1-mini').trim();
+    final response = await _postJson(
+      Uri.parse('https://api.openai.com/v1/responses'),
+      headers: {'Authorization': 'Bearer $apiKey'},
+      body: {
+        'model': model,
+        'input': prompt,
+        'temperature': 0.3,
+        'max_output_tokens': 700,
+      },
+    );
+
+    final outputText = response['output_text']?.toString();
+    if (outputText != null && outputText.trim().isNotEmpty) {
+      return outputText.trim();
+    }
+
+    final output = response['output'];
+    if (output is! List) return null;
+
+    final chunks = <String>[];
+    for (final item in output.whereType<Map>()) {
+      final content = item['content'];
+      if (content is List) {
+        for (final part in content.whereType<Map>()) {
+          final text = part['text']?.toString();
+          if (text != null && text.trim().isNotEmpty) {
+            chunks.add(text.trim());
+          }
+        }
+      }
+    }
+
+    return chunks.join('\n').trim();
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    Uri uri, {
+    required Map<String, String> headers,
+    required Map<String, dynamic> body,
+  }) async {
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      headers.forEach(request.headers.set);
+      request.write(jsonEncode(body));
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+            'AI request failed: ${response.statusCode} $responseBody');
+      }
+
+      final decoded = jsonDecode(responseBody);
+      return decoded is Map<String, dynamic>
+          ? decoded
+          : Map<String, dynamic>.from(decoded as Map);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  String _summaryPrompt(List<ChatMessage> messages) {
+    return '''
+Summarize this chat for the signed-in user.
+Keep it concise and useful. Include decisions, unresolved questions, important messages, and possible meetings when relevant.
+
+Conversation:
+${_conversationText(messages)}
+''';
+  }
+
+  String _questionPrompt({
+    required List<ChatMessage> messages,
+    required String currentUserId,
+    required String question,
+  }) {
+    return '''
+You are helping the signed-in user understand a chat conversation.
+The signed-in user id is $currentUserId.
+Answer the question using only the conversation. If the answer is not in the chat, say so briefly.
+
+Question: $question
+
+Conversation:
+${_conversationText(messages)}
+''';
+  }
+
+  String _conversationText(List<ChatMessage> messages) {
+    final latest = messages.length > 80
+        ? messages.sublist(messages.length - 80)
+        : messages;
+
+    return latest.map((message) {
+      final sender = _senderName(message);
+      final time = message.sentAt ?? '';
+      final content = (message.content ?? '').trim();
+      return '[$time] $sender: $content';
+    }).join('\n');
   }
 }

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:flint_client/flint_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +10,7 @@ import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/model/call_session_model.dart';
 import 'package:frontend/provider/call_provider.dart';
 import 'package:frontend/repositry/call_repositry.dart';
+import 'package:frontend/repositry/chat_repositry.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -21,25 +25,70 @@ class ActiveCallScreen extends ConsumerStatefulWidget {
 
 class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   RtcEngine? _engine;
+  FlintWebSocketClient? _eventSocket;
   int? _remoteUid;
   bool _joined = false;
   bool _muted = false;
   bool _cameraOff = false;
   bool _ending = false;
+  bool _closingFromRemote = false;
   String _statusText = 'Connecting...';
+  int _durationSeconds = 0;
+  Timer? _durationTimer;
 
   bool get _isVideo => widget.session.isVideoCall;
 
   @override
   void initState() {
     super.initState();
+    _connectCallEvents();
     _startAgora();
   }
 
   @override
   void dispose() {
+    _durationTimer?.cancel();
+    _eventSocket?.dispose();
     _leaveAgora();
     super.dispose();
+  }
+
+  Future<void> _connectCallEvents() async {
+    final socket = await ref.read(chatRepositryProvider).handShackSocket();
+    if (!mounted) {
+      socket.dispose();
+      return;
+    }
+
+    _eventSocket = socket;
+    socket.on('call:ended', _handleRemoteCallClosed);
+    socket.on('call:rejected', _handleRemoteCallClosed);
+    socket.on('call:missed', _handleRemoteCallClosed);
+    await socket.connect();
+  }
+
+  Future<void> _handleRemoteCallClosed(dynamic data) async {
+    final payload = _asMap(data);
+    final call = payload['call'] is Map
+        ? Map<String, dynamic>.from(payload['call'] as Map)
+        : <String, dynamic>{};
+    final callId = call['id']?.toString();
+
+    if (callId != widget.session.id) return;
+
+    await _closeBecausePeerLeft('Call ended');
+  }
+
+  Map<String, dynamic> _asMap(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    return <String, dynamic>{};
   }
 
   Future<void> _startAgora() async {
@@ -67,6 +116,7 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
           },
           onUserJoined: (connection, remoteUid, elapsed) {
             if (!mounted) return;
+            _startDurationTimer();
             setState(() {
               _remoteUid = remoteUid;
               _statusText = 'Connected';
@@ -78,6 +128,8 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
               _remoteUid = null;
               _statusText = '${widget.session.peerName} left the call';
             });
+            _durationTimer?.cancel();
+            _closeBecausePeerLeft('${widget.session.peerName} left the call');
           },
           onError: (error, message) {
             if (!mounted) return;
@@ -161,7 +213,7 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   }
 
   Future<void> _endCall() async {
-    if (_ending) return;
+    if (_ending || _closingFromRemote) return;
 
     setState(() {
       _ending = true;
@@ -175,11 +227,55 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
       // The local call still needs to close even if saving the log fails.
     }
 
+    _durationTimer?.cancel();
     await _leaveAgora();
 
     if (mounted) {
       Navigator.pop(context);
     }
+  }
+
+  Future<void> _closeBecausePeerLeft(String message) async {
+    if (_closingFromRemote || _ending) return;
+
+    _closingFromRemote = true;
+    _durationTimer?.cancel();
+
+    if (mounted) {
+      setState(() {
+        _statusText = message;
+      });
+    }
+
+    ref.invalidate(recentCallsProvider);
+    await _leaveAgora();
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  void _startDurationTimer() {
+    if (_durationTimer != null) return;
+
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _durationSeconds++;
+      });
+    });
+  }
+
+  String _formatDuration(int totalSeconds) {
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   Future<void> _toggleMute() async {
@@ -225,6 +321,8 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
               connection: RtcConnection(channelId: widget.session.channelName),
             ),
           ),
+        if (remoteUid != null)
+          Positioned(left: 20, top: 28, child: _buildCallInfoOverlay()),
         Positioned(
           right: 20,
           top: 28,
@@ -251,6 +349,45 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCallInfoOverlay() {
+    final peerName = widget.session.peerName.trim().isEmpty
+        ? 'Contact'
+        : widget.session.peerName.trim();
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              peerName,
+              style: AppStyle.circularTextStyle(
+                size: 16,
+                weight: FontWeight.w700,
+                color: AppColors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _formatDuration(_durationSeconds),
+              style: AppStyle.circularTextStyle(
+                size: 13,
+                weight: FontWeight.w600,
+                color: AppColors.textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -289,8 +426,18 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
               color: AppColors.textColor,
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            _formatDuration(_durationSeconds),
+            textAlign: TextAlign.center,
+            style: AppStyle.circularTextStyle(
+              size: 14,
+              weight: FontWeight.w600,
+              color: AppColors.textColor,
+            ),
+          ),
           if (_joined) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               _remoteUid == null ? 'Joined channel' : 'Remote user connected',
               style: AppStyle.circularTextStyle(

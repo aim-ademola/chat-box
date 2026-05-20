@@ -34,6 +34,7 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
   bool _loadingSummary = true;
   bool _asking = false;
   String? _error;
+  String _provider = 'gemini';
 
   @override
   void initState() {
@@ -56,7 +57,10 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
           _summary ??
           await ref
               .read(aiRepositryProvider)
-              .getChatSummary(conversationId: widget.conversationId);
+              .getChatSummary(
+                conversationId: widget.conversationId,
+                provider: _provider,
+              );
       if (!mounted) return;
       setState(() {
         _summary = summary;
@@ -96,7 +100,11 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
     try {
       final answer = await ref
           .read(aiRepositryProvider)
-          .askChat(conversationId: widget.conversationId, question: question);
+          .askChat(
+            conversationId: widget.conversationId,
+            question: question,
+            provider: _provider,
+          );
       if (!mounted) return;
       setState(() {
         _turns.add(
@@ -283,6 +291,37 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
     );
   }
 
+  Widget _buildProviderSwitch(ColorScheme colorScheme) {
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment(value: 'gemini', label: Text('Gemini')),
+        ButtonSegment(value: 'openai', label: Text('OpenAI')),
+        ButtonSegment(value: 'local', label: Text('Local')),
+      ],
+      selected: {_provider},
+      showSelectedIcon: false,
+      onSelectionChanged: _asking || _loadingSummary
+          ? null
+          : (values) {
+              final nextProvider = values.first;
+              setState(() {
+                _provider = nextProvider;
+                _summary = null;
+                _loadingSummary = true;
+                _error = null;
+              });
+              _loadSummary();
+            },
+      style: SegmentedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        textStyle: AppStyle.circularTextStyle(
+          size: 12,
+          weight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
   Widget _buildTurn(AiChatTurnModel turn, ColorScheme colorScheme) {
     final alignment = turn.isUser
         ? Alignment.centerRight
@@ -416,6 +455,11 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
                   icon: const Icon(Icons.close_rounded),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _buildProviderSwitch(colorScheme),
             ),
             const SizedBox(height: 16),
             Expanded(

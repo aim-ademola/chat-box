@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:frontend/core/constant/app_colors.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/model/call_session_model.dart';
@@ -19,10 +22,39 @@ class IncomingCallScreen extends ConsumerStatefulWidget {
 
 class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen> {
   bool _busy = false;
+  Timer? _ringTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startRinging();
+  }
+
+  @override
+  void dispose() {
+    _stopRinging();
+    super.dispose();
+  }
+
+  void _startRinging() {
+    SystemSound.play(SystemSoundType.alert);
+    HapticFeedback.vibrate();
+
+    _ringTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      SystemSound.play(SystemSoundType.alert);
+      HapticFeedback.vibrate();
+    });
+  }
+
+  void _stopRinging() {
+    _ringTimer?.cancel();
+    _ringTimer = null;
+  }
 
   Future<void> _accept() async {
     if (_busy) return;
 
+    _stopRinging();
     setState(() {
       _busy = true;
     });
@@ -52,6 +84,7 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen> {
   Future<void> _reject() async {
     if (_busy) return;
 
+    _stopRinging();
     setState(() {
       _busy = true;
     });

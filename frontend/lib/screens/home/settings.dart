@@ -79,7 +79,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: Text(
                         "Settings",
                         style: AppStyle.circularMediumStyle.copyWith(
-                          fontSize: 25,
+                          fontSize: 16,
                           color: AppColors.white,
                         ),
                       ),

@@ -57,6 +57,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       debugPrint('chat notification error: $data');
     });
 
+    _socket?.on('chat:notifications:ready', (dynamic data) {
+      debugPrint('notification socket ready: $data');
+    });
+
+    _socket?.on('connect', (_) {
+      debugPrint('notification socket connected');
+    });
+
+    _socket?.on('disconnect', (dynamic data) {
+      debugPrint('notification socket disconnected: $data');
+    });
+
     _socket?.on('call:incoming', _handleIncomingCall);
     _socket?.on('call:ended', (_) => ref.invalidate(recentCallsProvider));
     _socket?.on('call:rejected', (_) => ref.invalidate(recentCallsProvider));

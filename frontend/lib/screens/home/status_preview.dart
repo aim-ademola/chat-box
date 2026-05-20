@@ -79,7 +79,7 @@ class _StatusPreviewScreenState extends ConsumerState<StatusPreviewScreen> {
                         child: Text(
                           widget.userName,
                           style: AppStyle.circularTextStyle(
-                            size: 18,
+                            size: 16,
                             weight: FontWeight.w700,
                             color: Colors.white,
                           ),

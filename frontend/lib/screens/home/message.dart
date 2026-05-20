@@ -103,7 +103,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                       'Home',
                       textAlign: TextAlign.center,
                       style: AppStyle.circularTextStyle(
-                        size: 28,
+                        size: 16,
                         weight: FontWeight.w600,
                         color: Colors.white,
                       ),

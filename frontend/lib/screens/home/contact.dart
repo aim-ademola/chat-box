@@ -109,7 +109,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                       'Contacts',
                       textAlign: TextAlign.center,
                       style: AppStyle.circularTextStyle(
-                        size: 28,
+                        size: 16,
                         weight: FontWeight.w700,
                         color: Colors.white,
                       ),

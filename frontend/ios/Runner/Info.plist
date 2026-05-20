@@ -51,8 +51,14 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>ChatBox needs camera access for video calls.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>ChatBox needs contacts access when you choose people from your device contacts.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ChatBox needs microphone access for voice and video calls.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ChatBox needs permission to save media you choose to keep.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ChatBox needs photo library access so you can choose images for chats and status updates.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

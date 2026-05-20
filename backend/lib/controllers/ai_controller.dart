@@ -47,9 +47,11 @@ class AiController {
         .limit(150)
         .get();
 
-    final summary = _aiService.summarizeChat(
+    final provider = ctx.req.queryParam('provider');
+    final summary = await _aiService.summarizeChat(
       messages: messages,
       currentUserId: user.id,
+      provider: provider,
     );
 
     return res.json({
@@ -83,6 +85,7 @@ class AiController {
 
     final body = await ctx.req.json();
     final question = body['question']?.toString().trim() ?? '';
+    final provider = body['provider']?.toString().trim();
     if (question.isEmpty) {
       return res.status(400).json({
         'status': false,
@@ -102,10 +105,11 @@ class AiController {
     }
 
     final messages = await _conversationMessages(cleanConversationId);
-    final answer = _aiService.answerChatQuestion(
+    final answer = await _aiService.answerChatQuestion(
       messages: messages,
       currentUserId: user.id,
       question: question,
+      provider: provider,
     );
 
     return res.json({
