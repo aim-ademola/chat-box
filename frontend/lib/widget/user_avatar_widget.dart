@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/provider/core_provider.dart';
 import 'package:frontend/widget/profile_avatar_widget.dart';
 
 class UserAvatarWidget extends StatelessWidget {
@@ -19,6 +20,7 @@ class UserAvatarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl = _normalizedImageUrl(profilePicUrl);
     final fallback = ProfileAvatarWidget(
       initials: initials,
       backgroundColor: backgroundColor,
@@ -27,7 +29,7 @@ class UserAvatarWidget extends StatelessWidget {
       profilePicUrl: '',
     );
 
-    if (profilePicUrl == null || profilePicUrl!.isEmpty) {
+    if (imageUrl == null) {
       return fallback;
     }
 
@@ -36,11 +38,27 @@ class UserAvatarWidget extends StatelessWidget {
         width: radius * 2,
         height: radius * 2,
         child: Image.network(
-          profilePicUrl!,
+          imageUrl,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) => fallback,
         ),
       ),
     );
+  }
+
+  String? _normalizedImageUrl(String? value) {
+    final cleaned = value?.trim();
+    if (cleaned == null || cleaned.isEmpty) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(cleaned);
+    if (uri != null && uri.hasScheme) {
+      return cleaned;
+    }
+
+    final baseUri = Uri.parse(apiBaseUrl);
+    final normalizedPath = cleaned.startsWith('/') ? cleaned : '/$cleaned';
+    return baseUri.replace(path: normalizedPath).toString();
   }
 }

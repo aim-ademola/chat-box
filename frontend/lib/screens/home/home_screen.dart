@@ -109,7 +109,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             payload['userId']?.toString(),
             parsePresence(payload['status']),
           );
-      ref.invalidate(recentChatsProvider);
     });
 
     _socket?.on('call:incoming', _handleIncomingCall);
@@ -150,7 +149,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             (key, value) => MapEntry(key.toString(), parsePresence(value)),
           ),
         );
-    ref.invalidate(recentChatsProvider);
   }
 
   Future<void> _showMessageNotification(dynamic data) async {

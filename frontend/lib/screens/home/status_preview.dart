@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/model/status_item_model.dart';
+import 'package:frontend/provider/core_provider.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
 
 class StatusPreviewScreen extends ConsumerStatefulWidget {
@@ -241,7 +242,8 @@ class _StatusPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final type = (status.type ?? 'text').trim().toLowerCase();
     final hasCaption = status.content?.trim().isNotEmpty == true;
-    final hasMedia = status.url?.trim().isNotEmpty == true;
+    final mediaUrl = _normalizedMediaUrl(status.url);
+    final hasMedia = mediaUrl != null;
     final showImage = hasMedia && type == 'image';
     final showVideo = hasMedia && type == 'video';
     final showUnknownMedia =
@@ -268,18 +270,18 @@ class _StatusPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (showVideo) ...[
-              _VideoStatusTile(url: status.url!),
+              _VideoStatusTile(url: mediaUrl),
               if (showCaption) const SizedBox(height: 24),
             ] else if (showImage || showUnknownMedia) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: Image.network(
-                  status.url!,
+                  mediaUrl,
                   height: 320,
                   width: double.infinity,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) =>
-                      _BrokenMediaTile(url: status.url!),
+                      _BrokenMediaTile(url: mediaUrl),
                 ),
               ),
               if (showCaption) const SizedBox(height: 24),
@@ -310,6 +312,31 @@ class _StatusPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String? _normalizedMediaUrl(String? value) {
+    final cleaned = value?.trim();
+    if (cleaned == null || cleaned.isEmpty) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(cleaned);
+    if (uri != null && uri.hasScheme) {
+      return cleaned;
+    }
+
+    var path = cleaned.replaceAll('\\', '/');
+    if (path.startsWith('/')) {
+      path = path.substring(1);
+    }
+
+    if (!path.startsWith('public/')) {
+      path = path.startsWith('status/')
+          ? 'public/$path'
+          : 'public/status/$path';
+    }
+
+    return Uri.parse(apiBaseUrl).replace(path: '/$path').toString();
   }
 }
 

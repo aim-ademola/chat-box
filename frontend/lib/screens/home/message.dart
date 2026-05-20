@@ -15,8 +15,8 @@ import 'package:frontend/screens/home/status_preview.dart';
 import 'package:frontend/screens/home/upload_status.dart';
 import 'package:frontend/widget/circle_icon_button_widget.dart';
 import 'package:frontend/widget/message_tile_widget.dart';
-import 'package:frontend/widget/profile_avatar_widget.dart';
 import 'package:frontend/widget/story_avatar_widget.dart';
+import 'package:frontend/widget/user_avatar_widget.dart';
 
 class MessageScreen extends ConsumerStatefulWidget {
   const MessageScreen({super.key});
@@ -151,15 +151,14 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                   ),
                   GestureDetector(
                     onTap: () async {
-                      print("Hello iam started");
-                      await ref.watch(statusProvider.notifier).fetchStatuses();
-                      print("Am done");
+                      await ref.read(authProvider.notifier).me();
+                      await ref.read(statusProvider.notifier).fetchStatuses();
                     },
-                    child: const ProfileAvatarWidget(
-                      initials: 'AM',
-                      backgroundColor: Color(0xFFC8C5F7),
+                    child: UserAvatarWidget(
+                      initials: _initials(user?.name ?? ''),
+                      backgroundColor: const Color(0xFFC8C5F7),
                       radius: 28,
-                      profilePicUrl: '',
+                      profilePicUrl: user?.profilePicUrl,
                     ),
                   ),
                 ],

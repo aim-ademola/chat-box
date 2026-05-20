@@ -71,7 +71,7 @@ class UserController {
         updateData['name'] = name;
       }
       if (profilePicUrl != null) {
-        updateData['profile_pic'] = profilePicUrl;
+        updateData['profilePicUrl'] = profilePicUrl;
       }
       // Update the user in the database
       if (updateData.isNotEmpty) {

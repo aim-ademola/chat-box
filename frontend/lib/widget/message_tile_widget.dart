@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/core/theme/theme.dart';
 import 'package:frontend/model/message_item_model.dart';
+import 'package:frontend/provider/presence_provider.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
 
-class MessageTileWidget extends StatelessWidget {
+class MessageTileWidget extends ConsumerWidget {
   const MessageTileWidget({super.key, required this.item, this.onTap});
 
   final MessageItemModel item;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final palette = theme.extension<AppThemeColors>()!;
     final hasUnread = item.unreadCount > 0;
-    final presenceColor = item.statusColor == const Color(0xFF1EDB76)
-        ? palette.online
-        : item.statusColor == const Color(0xFFFFC94D)
-        ? const Color(0xFFFFC94D)
-        : palette.offline;
+    final presence = item.userId == null
+        ? null
+        : ref.watch(presenceProvider.select((state) => state[item.userId]));
+    final statusColor = presence == null
+        ? item.statusColor
+        : presenceColor(palette, presence);
 
     return Material(
       color: Colors.transparent,
@@ -49,7 +52,7 @@ class MessageTileWidget extends StatelessWidget {
                       width: 18,
                       height: 18,
                       decoration: BoxDecoration(
-                        color: presenceColor,
+                        color: statusColor,
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: palette.messageSheet,

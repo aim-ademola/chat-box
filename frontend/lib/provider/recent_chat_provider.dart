@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/model/chat_message_model.dart';
 import 'package:frontend/model/message_item_model.dart';
 import 'package:frontend/provider/auth_provider.dart';
-import 'package:frontend/provider/presence_provider.dart';
 import 'package:frontend/repositry/chat_repositry.dart';
 
 class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
@@ -19,7 +18,6 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
   @override
   Future<List<MessageItemModel>> build() async {
     final currentUser = await ref.watch(authProvider.future);
-    final presences = ref.watch(presenceProvider);
     if (currentUser == null) {
       return const [];
     }
@@ -28,14 +26,13 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
     final recentChats = await chatRepository.getRecentChats();
 
     return recentChats
-        .map((summary) => _toMessageItem(summary, currentUser.id, presences))
+        .map((summary) => _toMessageItem(summary, currentUser.id))
         .whereType<MessageItemModel>()
         .toList();
   }
 
   Future get() async {
     final currentUser = await ref.watch(authProvider.future);
-    final presences = ref.read(presenceProvider);
     if (currentUser == null) {
       return const [];
     }
@@ -44,7 +41,7 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
     final recentChats = await chatRepository.getRecentChats();
 
     var value = recentChats
-        .map((summary) => _toMessageItem(summary, currentUser.id, presences))
+        .map((summary) => _toMessageItem(summary, currentUser.id))
         .whereType<MessageItemModel>()
         .toList();
 
@@ -54,7 +51,6 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
   MessageItemModel? _toMessageItem(
     Map<String, dynamic> summary,
     String currentUserId,
-    Map<String, UserPresence> presences,
   ) {
     final peer = summary['peer'] is Map
         ? Map<String, dynamic>.from(summary['peer'] as Map)
@@ -73,7 +69,6 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
     );
     final peerId = peer['id']?.toString() ?? '';
     final peerName = peer['name']?.toString() ?? 'Unknown';
-    final presence = presences[peerId] ?? parsePresence(peer['presence']);
 
     return MessageItemModel(
       name: peerName,
@@ -81,7 +76,7 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
       time: lastMessage.time,
       initials: _initials(peerName),
       avatarColor: _avatarColor(peerId.isEmpty ? peerName : peerId),
-      statusColor: _presenceStatusColor(presence),
+      statusColor: _presenceStatusColor(peer['presence']),
       profilePicUrl: peer['profilePicUrl']?.toString(),
       userId: peerId.isEmpty ? null : peerId,
       unreadCount: int.tryParse(summary['unreadCount']?.toString() ?? '') ?? 0,
@@ -120,13 +115,13 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
     return _avatarPalette[seed.hashCode.abs() % _avatarPalette.length];
   }
 
-  Color _presenceStatusColor(UserPresence presence) {
-    switch (presence) {
-      case UserPresence.online:
+  Color _presenceStatusColor(dynamic rawPresence) {
+    switch (rawPresence?.toString().trim().toLowerCase()) {
+      case 'online':
         return const Color(0xFF1EDB76);
-      case UserPresence.away:
+      case 'away':
         return const Color(0xFFFFC94D);
-      case UserPresence.offline:
+      default:
         return const Color(0xFFBEC4C3);
     }
   }
