@@ -61,12 +61,12 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/images/logo.svg
+  image_path: assets/images/logo_launcher.png
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/images/logo.svg
+  adaptive_icon_foreground: assets/images/logo_launcher.png
   web:
     generate: true
-    image_path: assets/images/logo.svg
+    image_path: assets/images/logo_launcher.png
     background_color: "#FFFFFF"
     theme_color: "#24786D"
 
