@@ -9,8 +9,8 @@ class NotificationService {
     await AwesomeNotifications().initialize(null, [
       NotificationChannel(
         channelKey: chatChannelKey,
-        channelName: 'Chat messages',
-        channelDescription: 'Notifications for new chat messages',
+        channelName: 'ChatBox messages',
+        channelDescription: 'Notifications for new ChatBox messages',
         defaultColor: const Color(0xFF2D8C80),
         ledColor: Colors.white,
         importance: NotificationImportance.High,
@@ -20,8 +20,8 @@ class NotificationService {
       ),
       NotificationChannel(
         channelKey: callChannelKey,
-        channelName: 'Incoming calls',
-        channelDescription: 'Ringing alerts for incoming audio and video calls',
+        channelName: 'ChatBox calls',
+        channelDescription: 'Ringing alerts for incoming ChatBox audio and video calls',
         defaultColor: const Color(0xFF2D8C80),
         ledColor: Colors.white,
         importance: NotificationImportance.Max,
