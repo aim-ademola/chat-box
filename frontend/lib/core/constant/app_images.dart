@@ -14,7 +14,7 @@ class AppImages {
   static const String trash = '$_imagePath/trash.svg';
   static const String contact = '$_imagePath/user.svg';
   static const String call = '$_imagePath/Call.svg';
-  static const String notification = '$_imagePath/notification.png';
+  static const String notification = '$_imagePath/notification.svg';
 
   static const String user = '$_imagePath/user.svg';
   static const String users = user;
