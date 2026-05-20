@@ -20,6 +20,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController emailEditingController = TextEditingController();
   final TextEditingController passwordEditingController =
       TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -122,6 +123,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 AuthFormField(
                   label: 'Password',
                   controller: passwordEditingController,
+                  obscureText: _obscurePassword,
+                  showVisibilityButton: true,
+                  onVisibilityToggle: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
                 ),
 
                 SizedBox(height: 100),

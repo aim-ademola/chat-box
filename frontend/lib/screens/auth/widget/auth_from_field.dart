@@ -5,7 +5,17 @@ import 'package:frontend/core/constant/app_style.dart';
 class AuthFormField extends StatelessWidget {
   final String label;
   final TextEditingController? controller;
-  const AuthFormField({super.key, required this.label, this.controller});
+  final bool obscureText;
+  final VoidCallback? onVisibilityToggle;
+  final bool showVisibilityButton;
+  const AuthFormField({
+    super.key,
+    required this.label,
+    this.controller,
+    this.obscureText = false,
+    this.onVisibilityToggle,
+    this.showVisibilityButton = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +29,23 @@ class AuthFormField extends StatelessWidget {
             color: AppColors.primary,
           ),
         ),
-        TextFormField(controller: controller),
+        TextFormField(
+          controller: controller,
+          obscureText: obscureText,
+          decoration: InputDecoration(
+            suffixIcon: !showVisibilityButton
+                ? null
+                : IconButton(
+                    onPressed: onVisibilityToggle,
+                    icon: Icon(
+                      obscureText
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppColors.primary,
+                    ),
+                  ),
+          ),
+        ),
       ],
     );
   }

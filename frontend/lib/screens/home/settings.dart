@@ -4,6 +4,7 @@ import 'package:frontend/core/constant/app_images.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/core/extention/build_context_ext.dart';
 import 'package:frontend/provider/auth_provider.dart';
+import 'package:frontend/provider/theme_provider.dart';
 import 'package:frontend/screens/home/profile.dart';
 import 'package:frontend/widget/app_button.dart';
 import 'package:frontend/model/settings_item_model.dart';
@@ -62,6 +63,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     var authUser = ref.watch(authProvider);
+    final themeMode = ref.watch(themeNotifierProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final user = authUser.value;
     final displayName = user?.name.trim().isNotEmpty == true
@@ -197,6 +199,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                     const SizedBox(height: 40),
 
+                    _ThemeSettingTile(
+                      isDark: themeMode == ThemeMode.dark,
+                      onChanged: (value) {
+                        ref
+                            .read(themeNotifierProvider.notifier)
+                            .onChange(value);
+                      },
+                    ),
+
+                    const SizedBox(height: 8),
+
                     ...settingsItems.map(
                       (item) => SettingsTileWidget(item: item),
                     ),
@@ -241,5 +254,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     final value = parts.map((part) => part[0].toUpperCase()).join();
     return value.isEmpty ? 'U' : value;
+  }
+}
+
+class _ThemeSettingTile extends StatelessWidget {
+  const _ThemeSettingTile({required this.isDark, required this.onChanged});
+
+  final bool isDark;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = context.palette;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
+      child: Row(
+        children: [
+          Container(
+            height: 50,
+            width: 50,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Theme',
+                  style: AppStyle.circularMediumStyle.copyWith(
+                    fontSize: 18,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isDark ? 'Dark mode' : 'Light mode',
+                  style: AppStyle.circularMediumStyle.copyWith(
+                    fontSize: 14,
+                    color: palette.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(value: isDark, onChanged: onChanged),
+        ],
+      ),
+    );
   }
 }

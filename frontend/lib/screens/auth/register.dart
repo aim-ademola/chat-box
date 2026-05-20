@@ -18,6 +18,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController cPasswordController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
@@ -98,10 +100,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 AuthFormField(
                   label: 'Password',
                   controller: passwordController,
+                  obscureText: _obscurePassword,
+                  showVisibilityButton: true,
+                  onVisibilityToggle: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
                 ),
                 AuthFormField(
-                  label: 'Password',
+                  label: 'Confirm Password',
                   controller: cPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  showVisibilityButton: true,
+                  onVisibilityToggle: () {
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
+                  },
                 ),
 
                 SizedBox(height: 100),
