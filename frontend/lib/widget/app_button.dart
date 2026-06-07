@@ -17,23 +17,26 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 10),
-        height: 47,
-        width: MediaQuery.sizeOf(context).width,
-
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          color: backgroundColor,
-        ),
-
-        child: Center(
-          child: Text(
-            label,
-            style: AppStyle.carosBoldStyle(context).copyWith(color: textColor),
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: textColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
+          textStyle: const TextStyle(
+            fontFamily: 'circular',
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppStyle.carosBoldStyle(context).copyWith(color: textColor),
         ),
       ),
     );
