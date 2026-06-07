@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flint_client/flint_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +17,7 @@ import 'package:frontend/screens/home/active_call_screen.dart';
 import 'package:frontend/widget/chat_thread_item_widget.dart';
 import 'package:frontend/widget/ai_conversation_sheet.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   const ChatDetailScreen({super.key, required this.contact});
@@ -28,6 +31,7 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
 class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _imagePicker = ImagePicker();
   final List<ChatMessageModel> _messages = [];
 
   FlintWebSocketClient? _socket;
@@ -87,11 +91,15 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         return;
       }
 
-      final roomId = chatRepository.buildConversationId(
-        currentUserId: currentUser.id,
-        peerId: widget.contact.userId,
-        fallbackKey: widget.contact.name,
-      );
+      final roomId =
+          widget.contact.isGroup &&
+              widget.contact.conversationId?.trim().isNotEmpty == true
+          ? widget.contact.conversationId!.trim()
+          : chatRepository.buildConversationId(
+              currentUserId: currentUser.id,
+              peerId: widget.contact.userId,
+              fallbackKey: widget.contact.name,
+            );
 
       List<ChatMessageModel> history = const [];
       String? historyError;
@@ -141,11 +149,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
     _socket = socket;
 
-    socket.on("connecting", (dynamic state) {
-      print("connecting");
-    });
     socket.on('state_change', (dynamic state) {
-      print(state);
       if (!mounted) return;
       if (state is WebSocketConnectionState) {
         setState(() {
@@ -155,7 +159,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     });
 
     socket.on('connect', (_) {
-      print("conectted");
       if (!mounted) return;
       setState(() {
         _socketState = WebSocketConnectionState.connected;
@@ -163,7 +166,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     });
 
     socket.on('disconnect', (_) {
-      print("disconnecting");
       if (!mounted) return;
       setState(() {
         if (_socketState != WebSocketConnectionState.reconnecting) {
@@ -193,9 +195,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         currentUserId: currentUserId,
       );
 
-      setState(() {
-        _messages.add(_decorateIncomingMessage(message));
-      });
+      _appendMessage(message);
       if (!message.isMe) {
         _markOpenConversationRead();
       }
@@ -322,10 +322,45 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     _messageController.clear();
     socket.emit('chat:send', {
       'conversationId': roomId,
-      'recipientId': widget.contact.userId,
+      if (!widget.contact.isGroup) 'recipientId': widget.contact.userId,
       'content': text,
       'messageType': 'text',
     });
+  }
+
+  Future<void> _pickAndSendImage() async {
+    final roomId = _roomId;
+    final currentUserId = _currentUserId;
+    if (roomId == null || currentUserId == null) {
+      _showSnackBar('Chat is still loading.');
+      return;
+    }
+
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 82,
+    );
+    if (picked == null) {
+      return;
+    }
+
+    try {
+      final message = await ref
+          .read(chatRepositryProvider)
+          .sendMedia(
+            roomId: roomId,
+            currentUserId: currentUserId,
+            file: File(picked.path),
+            recipientId: widget.contact.isGroup ? null : widget.contact.userId,
+            messageType: 'image',
+          );
+      if (!mounted) return;
+      _appendMessage(message);
+      _scrollToBottom();
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Could not send the image.');
+    }
   }
 
   Future<void> _startAudioCall() async {
@@ -341,7 +376,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final roomId = _roomId;
 
     if (recipientId == null || recipientId.trim().isEmpty) {
-      _showSnackBar('This contact cannot receive calls yet.');
+      _showSnackBar(
+        widget.contact.isGroup
+            ? 'Group calls are not available yet.'
+            : 'This contact cannot receive calls yet.',
+      );
       return;
     }
 
@@ -413,6 +452,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       return 'Unavailable';
     }
 
+    if (widget.contact.isGroup) {
+      final count = widget.contact.memberCount;
+      return count > 0 ? '$count members' : 'Group chat';
+    }
+
     if (widget.contact.userId == null) {
       switch (_socketState) {
         case WebSocketConnectionState.connecting:
@@ -433,6 +477,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   Color _statusColor(AppThemeColors palette) {
+    if (widget.contact.isGroup) {
+      return palette.online;
+    }
+
     if (widget.contact.userId == null) {
       switch (_socketState) {
         case WebSocketConnectionState.connected:
@@ -482,6 +530,22 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         ],
       ),
     );
+  }
+
+  void _appendMessage(ChatMessageModel message) {
+    if (!mounted) {
+      return;
+    }
+
+    final messageId = message.id;
+    if (messageId != null &&
+        _messages.any((existing) => existing.id == messageId)) {
+      return;
+    }
+
+    setState(() {
+      _messages.add(_decorateIncomingMessage(message));
+    });
   }
 
   Widget _buildHeaderIcon({
@@ -638,12 +702,16 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       color: palette.messageSheet,
       child: Row(
         children: [
-          Icon(
-            Icons.attach_file_rounded,
-            size: 32,
-            color: colorScheme.onSurface,
+          IconButton(
+            tooltip: 'Attach image',
+            onPressed: _pickAndSendImage,
+            icon: Icon(
+              Icons.attach_file_rounded,
+              size: 30,
+              color: colorScheme.onSurface,
+            ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 6),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -779,18 +847,20 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       ],
                     ),
                   ),
-                  _buildHeaderIcon(
-                    icon: Icons.call_outlined,
-                    tooltip: 'Audio call',
-                    onPressed: _startAudioCall,
-                    color: colorScheme.onSurface,
-                  ),
-                  _buildHeaderIcon(
-                    icon: Icons.videocam_outlined,
-                    tooltip: 'Video call',
-                    onPressed: _startVideoCall,
-                    color: colorScheme.onSurface,
-                  ),
+                  if (!widget.contact.isGroup) ...[
+                    _buildHeaderIcon(
+                      icon: Icons.call_outlined,
+                      tooltip: 'Audio call',
+                      onPressed: _startAudioCall,
+                      color: colorScheme.onSurface,
+                    ),
+                    _buildHeaderIcon(
+                      icon: Icons.videocam_outlined,
+                      tooltip: 'Video call',
+                      onPressed: _startVideoCall,
+                      color: colorScheme.onSurface,
+                    ),
+                  ],
                   _buildAiHeaderMenu(colorScheme),
                 ],
               ),

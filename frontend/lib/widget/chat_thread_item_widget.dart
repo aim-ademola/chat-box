@@ -59,11 +59,14 @@ class ChatThreadItemWidget extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         UserAvatarWidget(
-          initials: contact.initials,
+          initials: contact.isGroup
+              ? _initials(message.senderName ?? contact.name)
+              : contact.initials,
           backgroundColor: contact.avatarColor,
           radius: 26,
-          profilePicUrl: contact.profilePicUrl,
-          isGroup: contact.isGroup,
+          profilePicUrl: contact.isGroup
+              ? message.senderProfilePicUrl
+              : contact.profilePicUrl,
         ),
         const SizedBox(width: 18),
         Expanded(
@@ -72,7 +75,9 @@ class ChatThreadItemWidget extends StatelessWidget {
             children: [
               if (message.showSender) ...[
                 Text(
-                  contact.name,
+                  contact.isGroup
+                      ? (message.senderName ?? 'Group member')
+                      : contact.name,
                   style: AppStyle.circularTextStyle(
                     size: 20,
                     weight: FontWeight.w700,
@@ -99,5 +104,16 @@ class ChatThreadItemWidget extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .toList();
+    final initials = parts.map((part) => part[0].toUpperCase()).join();
+    return initials.isEmpty ? 'U' : initials;
   }
 }

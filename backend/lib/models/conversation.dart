@@ -6,10 +6,14 @@ import 'package:flint_dart/schema.dart';
 class Conversation extends Model<Conversation> {
   Conversation() : super(() => Conversation());
 
-  String get userId => getAttribute('userId');
-  String get friendId => getAttribute('friendId');
-  String get lastMessageId => getAttribute('lastMessageId');
-  String get lastSenderId => getAttribute('lastSenderId');
+  String get userId => getAttribute('userId')?.toString() ?? '';
+  String get friendId => getAttribute('friendId')?.toString() ?? '';
+  String get lastMessageId => getAttribute('lastMessageId')?.toString() ?? '';
+  String get lastSenderId => getAttribute('lastSenderId')?.toString() ?? '';
+  String get type => getAttribute('type')?.toString() ?? 'direct';
+  String get title => getAttribute('title')?.toString() ?? '';
+  String get memberIds => getAttribute('memberIds')?.toString() ?? '';
+  String get createdBy => getAttribute('createdBy')?.toString() ?? '';
 
   Map<String, RelationDefinition> get relations => {
         'user': Relations.belongsTo<User>(
@@ -45,6 +49,15 @@ class Conversation extends Model<Conversation> {
         columns: [
           Column(name: 'userId', type: ColumnType.string),
           Column(name: 'friendId', type: ColumnType.string),
+          Column(
+            name: 'type',
+            type: ColumnType.string,
+            length: 32,
+            defaultValue: 'direct',
+          ),
+          Column(name: 'title', type: ColumnType.string, isNullable: true),
+          Column(name: 'memberIds', type: ColumnType.text, isNullable: true),
+          Column(name: 'createdBy', type: ColumnType.string, isNullable: true),
           Column(
               name: 'lastMessageId', type: ColumnType.string, isNullable: true),
           Column(

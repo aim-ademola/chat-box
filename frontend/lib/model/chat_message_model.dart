@@ -94,6 +94,9 @@ class ChatMessageModel {
         sender['profilePicUrl']?.toString() ??
         map['senderProfilePicUrl']?.toString();
 
+    final content = map['content']?.toString();
+    final imageUrls = _asStringList(map['imageUrls']);
+
     return ChatMessageModel(
       id: map['id']?.toString(),
       conversationId: map['conversationId']?.toString(),
@@ -102,9 +105,14 @@ class ChatMessageModel {
       type: type,
       time: _formatTime(sentAt),
       isMe: senderId != null && senderId == currentUserId,
-      text: map['content']?.toString(),
+      text: type == ChatMessageType.image
+          ? map['caption']?.toString()
+          : content,
       voiceDuration: map['voiceDuration']?.toString(),
-      imageUrls: _asStringList(map['imageUrls']),
+      imageUrls:
+          type == ChatMessageType.image && imageUrls.isEmpty && content != null
+          ? [content]
+          : imageUrls,
       senderName: senderName,
       senderProfilePicUrl: senderProfilePicUrl,
       sentAt: sentAt,

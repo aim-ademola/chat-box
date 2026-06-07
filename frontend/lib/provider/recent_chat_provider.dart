@@ -69,6 +69,15 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
     );
     final peerId = peer['id']?.toString() ?? '';
     final peerName = peer['name']?.toString() ?? 'Unknown';
+    final isGroup =
+        peer['isGroup'] == true ||
+        peer['presence']?.toString().trim().toLowerCase() == 'group';
+    final memberCount = peer['memberIds'] is List
+        ? (peer['memberIds'] as List).length
+        : int.tryParse(
+                RegExp(r'\d+').stringMatch(peer['bio']?.toString() ?? '') ?? '',
+              ) ??
+              0;
 
     return MessageItemModel(
       name: peerName,
@@ -76,10 +85,15 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
       time: lastMessage.time,
       initials: _initials(peerName),
       avatarColor: _avatarColor(peerId.isEmpty ? peerName : peerId),
-      statusColor: _presenceStatusColor(peer['presence']),
+      statusColor: isGroup
+          ? const Color(0xFF24786D)
+          : _presenceStatusColor(peer['presence']),
       profilePicUrl: peer['profilePicUrl']?.toString(),
-      userId: peerId.isEmpty ? null : peerId,
+      userId: isGroup || peerId.isEmpty ? null : peerId,
+      conversationId: summary['conversationId']?.toString(),
       unreadCount: int.tryParse(summary['unreadCount']?.toString() ?? '') ?? 0,
+      isGroup: isGroup,
+      memberCount: memberCount,
     );
   }
 

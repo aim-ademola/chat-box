@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flint_client/flint_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/model/chat_message_model.dart';
@@ -64,7 +66,6 @@ class ChatRepositry {
   Future<List<Map<String, dynamic>>> getRecentChats() async {
     final headers = await authRepository.authHeaders();
 
-    print("i get here");
     final res = await client.get(
       '/chat/recent',
       headers: headers,
@@ -74,7 +75,6 @@ class ChatRepositry {
 
     final responseData = res.data;
 
-    print(responseData);
     final rawChats = responseData is Map
         ? responseData['data'] as List<dynamic>? ?? const []
         : const [];
@@ -82,6 +82,57 @@ class ChatRepositry {
     return rawChats
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
+  }
+
+  Future<Map<String, dynamic>> createGroup({
+    required String title,
+    required List<String> memberIds,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/chat/groups',
+      headers: headers,
+      body: {'title': title, 'memberIds': memberIds},
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final data = responseData is Map ? responseData['data'] : null;
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<ChatMessageModel> sendMedia({
+    required String roomId,
+    required String currentUserId,
+    required File file,
+    String? recipientId,
+    String caption = '',
+    String messageType = 'image',
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final body = {'messageType': messageType, 'caption': caption};
+    if (recipientId != null) {
+      body['recipientId'] = recipientId;
+    }
+
+    final res = await client.post(
+      '/chat/rooms/$roomId/media',
+      headers: headers,
+      files: {'file': file},
+      body: body,
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final data = responseData is Map ? responseData['data'] : null;
+    if (data is! Map) {
+      throw const FormatException('Invalid media message response');
+    }
+
+    return ChatMessageModel.fromMap(
+      Map<String, dynamic>.from(data),
+      currentUserId: currentUserId,
+    );
   }
 
   Future<FlintWebSocketClient> createSocket(String roomId) async {

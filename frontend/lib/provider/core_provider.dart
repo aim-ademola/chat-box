@@ -4,7 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://192.168.1.122:3001',
+  defaultValue: 'https://rosemarie-nonforming-lukas.ngrok-free.dev',
 );
 
 final flintCLient = Provider(

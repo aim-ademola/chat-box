@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/core/theme/theme.dart';
 import 'package:frontend/model/chat_message_model.dart';
+import 'package:frontend/provider/core_provider.dart';
 
 class ChatMessageBubbleWidget extends StatelessWidget {
   const ChatMessageBubbleWidget({super.key, required this.message});
@@ -96,25 +97,56 @@ class ChatMessageBubbleWidget extends StatelessWidget {
             color: palette.messageSheet.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(22),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (var i = 0; i < message.imageUrls.take(2).length; i++)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < message.imageUrls.take(2).length; i++)
+                    Padding(
+                      padding: EdgeInsets.only(right: i == 0 ? 8 : 0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Image.network(
+                          _normalizedUrl(message.imageUrls[i]),
+                          width: 142,
+                          height: 142,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              if ((message.text ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
                 Padding(
-                  padding: EdgeInsets.only(right: i == 0 ? 8 : 0),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: Image.network(
-                      message.imageUrls[i],
-                      width: 116,
-                      height: 116,
-                      fit: BoxFit.cover,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    message.text!,
+                    style: AppStyle.circularTextStyle(
+                      size: 15,
+                      weight: FontWeight.w500,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         );
     }
+  }
+
+  String _normalizedUrl(String value) {
+    final cleaned = value.trim();
+    final uri = Uri.tryParse(cleaned);
+    if (uri != null && uri.hasScheme) {
+      return cleaned;
+    }
+
+    final baseUri = Uri.parse(apiBaseUrl);
+    final normalizedPath = cleaned.startsWith('/') ? cleaned : '/$cleaned';
+    return baseUri.replace(path: normalizedPath).toString();
   }
 }

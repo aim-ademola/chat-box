@@ -8,6 +8,7 @@ import 'package:frontend/model/message_item_model.dart';
 import 'package:frontend/model/user_model.dart';
 import 'package:frontend/provider/contacts_provider.dart';
 import 'package:frontend/screens/home/chat_detail.dart';
+import 'package:frontend/screens/home/create_group_screen.dart';
 import 'package:frontend/screens/home/user_profile_screen.dart';
 import 'package:frontend/widget/circle_icon_button_widget.dart';
 import 'package:frontend/widget/contact_tile_widget.dart';
@@ -92,6 +93,13 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
     );
   }
 
+  Future<void> _openCreateGroup() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -123,20 +131,27 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                       ),
                     ),
                   ),
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: palette.searchBorder,
-                        width: 1.5,
+                  Tooltip(
+                    message: 'Create group',
+                    child: InkWell(
+                      onTap: _openCreateGroup,
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: palette.searchBorder,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.groups_2_outlined,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
-                    ),
-                    child: const Icon(
-                      Icons.person_add_alt_1_rounded,
-                      color: Colors.white,
-                      size: 28,
                     ),
                   ),
                 ],

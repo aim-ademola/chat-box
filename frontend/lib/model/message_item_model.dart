@@ -10,8 +10,10 @@ class MessageItemModel {
     required this.statusColor,
     this.profilePicUrl,
     this.userId,
+    this.conversationId,
     this.unreadCount = 0,
     this.isGroup = false,
+    this.memberCount = 0,
   });
 
   final String name;
@@ -22,8 +24,10 @@ class MessageItemModel {
   final Color statusColor;
   final String? profilePicUrl;
   final String? userId;
+  final String? conversationId;
   final int unreadCount;
   final bool isGroup;
+  final int memberCount;
 
   MessageItemModel copyWith({
     String? name,
@@ -34,8 +38,10 @@ class MessageItemModel {
     Color? statusColor,
     String? profilePicUrl,
     String? userId,
+    String? conversationId,
     int? unreadCount,
     bool? isGroup,
+    int? memberCount,
   }) {
     return MessageItemModel(
       name: name ?? this.name,
@@ -46,8 +52,10 @@ class MessageItemModel {
       statusColor: statusColor ?? this.statusColor,
       profilePicUrl: profilePicUrl ?? this.profilePicUrl,
       userId: userId ?? this.userId,
+      conversationId: conversationId ?? this.conversationId,
       unreadCount: unreadCount ?? this.unreadCount,
       isGroup: isGroup ?? this.isGroup,
+      memberCount: memberCount ?? this.memberCount,
     );
   }
 }

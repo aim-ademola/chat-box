@@ -10,7 +10,7 @@ void main() {
 
   app.use(LoggerMiddleware());
 
-  app.static('/public', 'public');
+  app.use(StaticFileMiddleware());
   app.routes(AppRoutes());
   app.listen(port: 3001, hotReload: true);
 }
