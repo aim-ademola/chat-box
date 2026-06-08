@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flint_client/flint_client.dart';
@@ -5,12 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/model/chat_message_model.dart';
 import 'package:frontend/provider/core_provider.dart';
 import 'package:frontend/repositry/auth_repositry.dart';
+import 'package:frontend/services/local_database_service.dart';
 
 class ChatRepositry {
-  ChatRepositry({required this.client, required this.authRepository});
+  ChatRepositry({
+    required this.client,
+    required this.authRepository,
+    required this.localDatabase,
+  });
 
   final FlintClient client;
   final AuthRepositry authRepository;
+  final LocalDatabaseService localDatabase;
 
   String buildConversationId({
     required String currentUserId,
@@ -41,26 +48,39 @@ class ChatRepositry {
     required String roomId,
     required String currentUserId,
   }) async {
-    final headers = await authRepository.authHeaders();
-    final res = await client.get(
-      '/chat/rooms/$roomId/messages',
-      headers: headers,
-    );
-    res.throwIfError();
+    try {
+      final headers = await authRepository.authHeaders();
+      final res = await client.get(
+        '/chat/rooms/$roomId/messages',
+        headers: headers,
+      );
+      res.throwIfError();
 
-    final responseData = res.data;
-    final rawMessages = responseData is Map
-        ? responseData['data'] as List<dynamic>? ?? const []
-        : const [];
+      final responseData = res.data;
+      final rawMessages = responseData is Map
+          ? responseData['data'] as List<dynamic>? ?? const []
+          : const [];
+      final messages = rawMessages
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
 
-    return rawMessages
-        .map(
-          (item) => ChatMessageModel.fromMap(
-            Map<String, dynamic>.from(item as Map),
-            currentUserId: currentUserId,
-          ),
-        )
-        .toList();
+      await localDatabase.saveChatMessages(roomId, messages);
+
+      return messages
+          .map(
+            (item) =>
+                ChatMessageModel.fromMap(item, currentUserId: currentUserId),
+          )
+          .toList();
+    } catch (_) {
+      final cachedMessages = await localDatabase.getChatMessages(roomId);
+      return cachedMessages
+          .map(
+            (item) =>
+                ChatMessageModel.fromMap(item, currentUserId: currentUserId),
+          )
+          .toList();
+    }
   }
 
   Future<List<Map<String, dynamic>>> getRecentChats() async {
@@ -195,10 +215,58 @@ class ChatRepositry {
       throw const FormatException('Invalid media message response');
     }
 
-    return ChatMessageModel.fromMap(
+    final message = ChatMessageModel.fromMap(
       Map<String, dynamic>.from(data),
       currentUserId: currentUserId,
     );
+    await cacheMessage(roomId: roomId, message: message);
+    return message;
+  }
+
+  Future<ChatMessageModel> votePoll({
+    required String roomId,
+    required String messageId,
+    required int optionIndex,
+    required String currentUserId,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/chat/rooms/$roomId/polls/$messageId/vote',
+      headers: headers,
+      body: {'optionIndex': optionIndex},
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final data = responseData is Map ? responseData['data'] : null;
+    if (data is! Map) {
+      throw const FormatException('Invalid poll vote response');
+    }
+
+    final message = ChatMessageModel.fromMap(
+      Map<String, dynamic>.from(data),
+      currentUserId: currentUserId,
+    );
+    await cacheMessage(roomId: roomId, message: message);
+    return message;
+  }
+
+  Future<void> cacheMessage({
+    required String roomId,
+    required ChatMessageModel message,
+  }) async {
+    await localDatabase.saveChatMessage(
+      roomId,
+      _cachePayloadFromMessage(message),
+    );
+  }
+
+  Future<void> markCachedMessagesRead({
+    required String roomId,
+    required Set<String> messageIds,
+    required String readAt,
+  }) async {
+    await localDatabase.markChatMessagesRead(roomId, messageIds, readAt);
   }
 
   Future<FlintWebSocketClient> createSocket(String roomId) async {
@@ -215,5 +283,45 @@ class ChatRepositry {
 final chatRepositryProvider = Provider<ChatRepositry>((ref) {
   final client = ref.read(flintCLient);
   final authRepository = ref.read(authRepositryProvider);
-  return ChatRepositry(client: client, authRepository: authRepository);
+  final localDatabase = ref.read(localDatabaseProvider);
+  return ChatRepositry(
+    client: client,
+    authRepository: authRepository,
+    localDatabase: localDatabase,
+  );
 });
+
+Map<String, dynamic> _cachePayloadFromMessage(ChatMessageModel message) {
+  final map = message.toMap();
+  map['messageType'] = message.type.name;
+  map['pollVotes'] = message.pollVotes.map(
+    (key, value) => MapEntry(key.toString(), value),
+  );
+
+  switch (message.type) {
+    case ChatMessageType.image:
+      map['content'] = message.imageUrls.isNotEmpty
+          ? message.imageUrls.first
+          : message.mediaUrl;
+      map['caption'] = message.text;
+      break;
+    case ChatMessageType.video:
+    case ChatMessageType.voice:
+      map['content'] = message.mediaUrl ?? message.text;
+      break;
+    case ChatMessageType.poll:
+      map['content'] = jsonEncode({
+        'question': message.pollQuestion ?? message.text ?? '',
+        'options': message.pollOptions,
+        'votes': message.pollVotes.map(
+          (key, value) => MapEntry(key.toString(), value),
+        ),
+      });
+      break;
+    case ChatMessageType.text:
+      map['content'] = message.text;
+      break;
+  }
+
+  return map;
+}

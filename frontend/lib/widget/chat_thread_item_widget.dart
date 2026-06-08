@@ -12,12 +12,14 @@ class ChatThreadItemWidget extends StatelessWidget {
     required this.contact,
     required this.message,
     this.onMessageLongPress,
+    this.onPollVote,
     this.isTranslating = false,
   });
 
   final MessageItemModel contact;
   final ChatMessageModel message;
   final VoidCallback? onMessageLongPress;
+  final ValueChanged<int>? onPollVote;
   final bool isTranslating;
 
   @override
@@ -32,6 +34,7 @@ class ChatThreadItemWidget extends StatelessWidget {
           ChatMessageBubbleWidget(
             message: message,
             onLongPress: onMessageLongPress,
+            onPollVote: onPollVote,
             isTranslating: isTranslating,
           ),
           const SizedBox(height: 10),
@@ -97,6 +100,7 @@ class ChatThreadItemWidget extends StatelessWidget {
               ChatMessageBubbleWidget(
                 message: message,
                 onLongPress: onMessageLongPress,
+                onPollVote: onPollVote,
                 isTranslating: isTranslating,
               ),
               const SizedBox(height: 10),

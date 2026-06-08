@@ -102,17 +102,20 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
   }
 
   String _previewText(ChatMessageModel message) {
-    final text = message.text?.trim();
-    if (text != null && text.isNotEmpty) {
-      return text;
-    }
-
     switch (message.type) {
       case ChatMessageType.image:
         return 'Photo';
+      case ChatMessageType.video:
+        return 'Video';
+      case ChatMessageType.poll:
+        return 'Poll: ${message.pollQuestion ?? message.text ?? 'Question'}';
       case ChatMessageType.voice:
         return 'Voice message';
       case ChatMessageType.text:
+        final text = message.text?.trim();
+        if (text != null && text.isNotEmpty) {
+          return text;
+        }
         return 'Message';
     }
   }

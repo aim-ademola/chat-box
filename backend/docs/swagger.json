@@ -506,6 +506,39 @@
         ]
       }
     },
+    "/chat/rooms/{roomId}/polls/{messageId}/vote": {
+      "post": {
+        "summary": "",
+        "tags": [
+          "Default"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter: roomId"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter: messageId"
+          }
+        ]
+      }
+    },
     "/chat/rooms/{roomId}": {
       "get": {
         "summary": "",

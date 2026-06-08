@@ -24,6 +24,8 @@ class ChatRoutes extends RouteGroup {
         '/rooms/:roomId/messages', AuthMiddleware().handle(controller.history));
     app.post(
         '/rooms/:roomId/media', AuthMiddleware().handle(controller.sendMedia));
+    app.post('/rooms/:roomId/polls/:messageId/vote',
+        AuthMiddleware().handle(controller.votePoll));
     app.websocket('/rooms/:roomId', controller.connect);
     app.websocket('/connect', controller.handShack);
   }

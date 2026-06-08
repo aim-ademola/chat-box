@@ -13,6 +13,7 @@ class ChatMessage extends Model<ChatMessage> {
   String? get messageType => getAttribute('messageType');
   String? get sentAt => getAttribute('sentAt');
   String? get readAt => getAttribute('readAt');
+  String? get expiresAt => getAttribute('expiresAt');
   User? get sender => getRelation<User>('sender');
 
   @override
@@ -61,6 +62,12 @@ class ChatMessage extends Model<ChatMessage> {
           ),
           Column(
             name: 'readAt',
+            type: ColumnType.string,
+            length: 64,
+            defaultValue: '',
+          ),
+          Column(
+            name: 'expiresAt',
             type: ColumnType.string,
             length: 64,
             defaultValue: '',

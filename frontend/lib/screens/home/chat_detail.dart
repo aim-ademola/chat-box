@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flint_client/flint_client.dart';
@@ -20,6 +22,8 @@ import 'package:frontend/widget/chat_thread_item_widget.dart';
 import 'package:frontend/widget/ai_conversation_sheet.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   const ChatDetailScreen({super.key, required this.contact});
@@ -34,14 +38,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _imagePicker = ImagePicker();
+  final AudioRecorder _audioRecorder = AudioRecorder();
   final List<ChatMessageModel> _messages = [];
   final Set<String> _translatingMessageKeys = {};
+  Timer? _readTickTimer;
 
   FlintWebSocketClient? _socket;
   WebSocketConnectionState _socketState = WebSocketConnectionState.disconnected;
   String? _roomId;
   String? _currentUserId;
   bool _loading = true;
+  bool _isRecording = false;
   String? _historyError;
   String? _fatalError;
   AiSummaryModel? _aiSummary;
@@ -66,6 +73,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   @override
   void dispose() {
     _socket?.dispose();
+    _readTickTimer?.cancel();
+    _audioRecorder.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -142,6 +151,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       ref.invalidate(recentChatsProvider);
 
       await _connectSocket(chatRepository, roomId);
+      _startReadTick();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -216,6 +226,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       _scrollToBottom();
     });
 
+    socket.on('chat:poll_updated', (dynamic data) {
+      final currentUserId = _currentUserId;
+      if (!mounted || currentUserId == null) return;
+
+      final message = ChatMessageModel.fromMap(
+        _asMap(data),
+        currentUserId: currentUserId,
+      );
+      _replaceMessage(message);
+    });
+
     socket.on('chat:read', (dynamic data) {
       final payload = _asMap(data);
       final ids = payload['messageIds'] is List
@@ -237,6 +258,19 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           }
         }
       });
+
+      final roomId = _roomId;
+      if (roomId != null) {
+        unawaited(
+          ref
+              .read(chatRepositryProvider)
+              .markCachedMessagesRead(
+                roomId: roomId,
+                messageIds: ids,
+                readAt: readAt,
+              ),
+        );
+      }
     });
 
     await socket.connect();
@@ -320,6 +354,34 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     ref.invalidate(recentChatsProvider);
   }
 
+  void _startReadTick() {
+    _readTickTimer?.cancel();
+    _readTickTimer = Timer.periodic(const Duration(minutes: 10), (_) async {
+      _markOpenConversationRead();
+      await _refreshHistoryForExpiry();
+    });
+  }
+
+  Future<void> _refreshHistoryForExpiry() async {
+    final roomId = _roomId;
+    final currentUserId = _currentUserId;
+    if (roomId == null || currentUserId == null || !mounted) {
+      return;
+    }
+
+    try {
+      final history = await ref
+          .read(chatRepositryProvider)
+          .getHistory(roomId: roomId, currentUserId: currentUserId);
+      if (!mounted) return;
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(_decorateConversation(history));
+      });
+    } catch (_) {}
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) {
@@ -343,6 +405,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   Future<void> _pickAndSendImage() async {
+    await _pickAndSendMedia(messageType: 'image');
+  }
+
+  Future<void> _pickAndSendVideo() async {
+    await _pickAndSendMedia(messageType: 'video');
+  }
+
+  Future<void> _pickAndSendMedia({required String messageType}) async {
     final roomId = _roomId;
     final currentUserId = _currentUserId;
     if (roomId == null || currentUserId == null) {
@@ -350,10 +420,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       return;
     }
 
-    final picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 82,
-    );
+    final picked = messageType == 'video'
+        ? await _imagePicker.pickVideo(source: ImageSource.gallery)
+        : await _imagePicker.pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 82,
+          );
     if (picked == null) {
       return;
     }
@@ -366,14 +438,184 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             currentUserId: currentUserId,
             file: File(picked.path),
             recipientId: widget.contact.isGroup ? null : widget.contact.userId,
-            messageType: 'image',
+            messageType: messageType,
           );
       if (!mounted) return;
       _appendMessage(message);
       _scrollToBottom();
     } catch (_) {
       if (!mounted) return;
-      _showSnackBar('Could not send the image.');
+      _showSnackBar('Could not send the media.');
+    }
+  }
+
+  Future<void> _openComposerActions() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => const _ComposerActionSheet(),
+    );
+
+    switch (action) {
+      case 'photo':
+        await _pickAndSendImage();
+        break;
+      case 'video':
+        await _pickAndSendVideo();
+        break;
+      case 'poll':
+        await _openCreatePollSheet();
+        break;
+    }
+  }
+
+  Future<void> _openCreatePollSheet() async {
+    final poll = await showModalBottomSheet<_PollDraft>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => const _CreatePollSheet(),
+    );
+
+    if (poll == null) {
+      return;
+    }
+
+    _sendPoll(poll);
+  }
+
+  void _sendPoll(_PollDraft poll) {
+    final socket = _socket;
+    final roomId = _roomId;
+    if (socket == null || roomId == null) {
+      _showSnackBar('Chat is still connecting.');
+      return;
+    }
+
+    socket.emit('chat:send', {
+      'conversationId': roomId,
+      if (!widget.contact.isGroup) 'recipientId': widget.contact.userId,
+      'content': jsonEncode({
+        'question': poll.question,
+        'options': poll.options,
+        'votes': <String, List<String>>{},
+      }),
+      'messageType': 'poll',
+    });
+  }
+
+  Future<void> _votePoll(ChatMessageModel message, int optionIndex) async {
+    final roomId = _roomId;
+    final currentUserId = _currentUserId;
+    final messageId = message.id;
+    if (roomId == null || currentUserId == null || messageId == null) {
+      _showSnackBar('Poll is still syncing.');
+      return;
+    }
+
+    try {
+      final updated = await ref
+          .read(chatRepositryProvider)
+          .votePoll(
+            roomId: roomId,
+            messageId: messageId,
+            optionIndex: optionIndex,
+            currentUserId: currentUserId,
+          );
+      if (!mounted) return;
+      _replaceMessage(updated);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Could not vote on this poll.');
+    }
+  }
+
+  Future<void> _toggleVoiceRecording() async {
+    if (_isRecording) {
+      await _stopAndSendVoiceRecording();
+      return;
+    }
+
+    await _startVoiceRecording();
+  }
+
+  Future<void> _startVoiceRecording() async {
+    final hasPermission = await _audioRecorder.hasPermission();
+    if (!hasPermission) {
+      _showSnackBar('Microphone permission is needed to record voice notes.');
+      return;
+    }
+
+    final directory = await getTemporaryDirectory();
+    final path =
+        '${directory.path}${Platform.pathSeparator}chatbox_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+    await _audioRecorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 128000,
+        sampleRate: 44100,
+      ),
+      path: path,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isRecording = true;
+    });
+  }
+
+  Future<void> _stopAndSendVoiceRecording() async {
+    final path = await _audioRecorder.stop();
+    if (!mounted) return;
+    setState(() {
+      _isRecording = false;
+    });
+
+    if (path == null || path.trim().isEmpty) {
+      _showSnackBar('Recording could not be saved.');
+      return;
+    }
+
+    final file = File(path);
+    if (!await file.exists()) {
+      _showSnackBar('Recording file was not found.');
+      return;
+    }
+
+    await _sendRecordedVoice(file);
+  }
+
+  Future<void> _sendRecordedVoice(File file) async {
+    final roomId = _roomId;
+    final currentUserId = _currentUserId;
+    if (roomId == null || currentUserId == null) {
+      _showSnackBar('Chat is still loading.');
+      return;
+    }
+
+    try {
+      final message = await ref
+          .read(chatRepositryProvider)
+          .sendMedia(
+            roomId: roomId,
+            currentUserId: currentUserId,
+            file: file,
+            recipientId: widget.contact.isGroup ? null : widget.contact.userId,
+            messageType: 'voice',
+          );
+      if (!mounted) return;
+      _appendMessage(message);
+      _scrollToBottom();
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Could not send the voice note.');
     }
   }
 
@@ -554,17 +796,24 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     required String translatedText,
     required String language,
   }) {
+    ChatMessageModel? updatedMessage;
     setState(() {
       for (var i = 0; i < _messages.length; i++) {
         if (_messageKey(_messages[i]) == key) {
-          _messages[i] = _messages[i].copyWith(
+          updatedMessage = _messages[i].copyWith(
             translatedText: translatedText,
             translationLanguage: language,
           );
+          _messages[i] = updatedMessage!;
           break;
         }
       }
     });
+
+    final message = updatedMessage;
+    if (message != null) {
+      _cacheMessage(message);
+    }
   }
 
   String _messageKey(ChatMessageModel message) {
@@ -680,6 +929,46 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     setState(() {
       _messages.add(_decorateIncomingMessage(message));
     });
+    _cacheMessage(message);
+  }
+
+  void _replaceMessage(ChatMessageModel message) {
+    if (!mounted) {
+      return;
+    }
+
+    final messageId = message.id;
+    if (messageId == null || messageId.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      for (var i = 0; i < _messages.length; i++) {
+        if (_messages[i].id == messageId) {
+          _messages[i] = _decorateMessage(
+            message,
+            i == 0 ? null : _messages[i - 1],
+          );
+          return;
+        }
+      }
+
+      _messages.add(_decorateIncomingMessage(message));
+    });
+    _cacheMessage(message);
+  }
+
+  void _cacheMessage(ChatMessageModel message) {
+    final roomId = _roomId;
+    if (roomId == null || roomId.trim().isEmpty) {
+      return;
+    }
+
+    unawaited(
+      ref
+          .read(chatRepositryProvider)
+          .cacheMessage(roomId: roomId, message: message),
+    );
   }
 
   Widget _buildHeaderIcon({
@@ -832,6 +1121,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             onMessageLongPress: message.type == ChatMessageType.text
                 ? () => _openMessageActions(message)
                 : null,
+            onPollVote: message.type == ChatMessageType.poll
+                ? (optionIndex) => _votePoll(message, optionIndex)
+                : null,
           ),
           const SizedBox(height: 28),
         ],
@@ -846,8 +1138,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       child: Row(
         children: [
           IconButton(
-            tooltip: 'Attach image',
-            onPressed: _pickAndSendImage,
+            tooltip: 'Attach',
+            onPressed: _openComposerActions,
             icon: Icon(
               Icons.attach_file_rounded,
               size: 30,
@@ -907,7 +1199,20 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             ),
           ),
           const SizedBox(width: 18),
-          Icon(Icons.mic_none_rounded, size: 32, color: colorScheme.onSurface),
+          IconButton(
+            tooltip: _isRecording ? 'Stop recording' : 'Record voice note',
+            onPressed: _toggleVoiceRecording,
+            style: IconButton.styleFrom(
+              backgroundColor: _isRecording
+                  ? colorScheme.error.withValues(alpha: 0.14)
+                  : Colors.transparent,
+            ),
+            icon: Icon(
+              _isRecording ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+              size: 32,
+              color: _isRecording ? colorScheme.error : colorScheme.onSurface,
+            ),
+          ),
         ],
       ),
     );
@@ -1222,6 +1527,324 @@ class _MessageTranslationSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ComposerActionSheet extends StatelessWidget {
+  const _ComposerActionSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 52,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: palette.handle,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Text(
+              'Add to chat',
+              style: AppStyle.circularTextStyle(
+                size: 24,
+                weight: FontWeight.w800,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _ComposerActionTile(
+              icon: Icons.image_outlined,
+              title: 'Send photo',
+              subtitle: 'Share an image from your gallery',
+              onTap: () => Navigator.pop(context, 'photo'),
+            ),
+            const SizedBox(height: 12),
+            _ComposerActionTile(
+              icon: Icons.video_library_outlined,
+              title: 'Send video',
+              subtitle: 'Share a video from your gallery',
+              onTap: () => Navigator.pop(context, 'video'),
+            ),
+            const SizedBox(height: 12),
+            _ComposerActionTile(
+              icon: Icons.poll_outlined,
+              title: 'Create poll',
+              subtitle: 'Ask a question with multiple options',
+              onTap: () => Navigator.pop(context, 'poll'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ComposerActionTile extends StatelessWidget {
+  const _ComposerActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: colorScheme.primary),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppStyle.circularTextStyle(
+                        size: 16,
+                        weight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: AppStyle.circularTextStyle(
+                        size: 13,
+                        weight: FontWeight.w500,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: palette.secondaryText),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PollDraft {
+  const _PollDraft({required this.question, required this.options});
+
+  final String question;
+  final List<String> options;
+}
+
+class _CreatePollSheet extends StatefulWidget {
+  const _CreatePollSheet();
+
+  @override
+  State<_CreatePollSheet> createState() => _CreatePollSheetState();
+}
+
+class _CreatePollSheetState extends State<_CreatePollSheet> {
+  final TextEditingController _questionController = TextEditingController();
+  final List<TextEditingController> _optionControllers = [
+    TextEditingController(),
+    TextEditingController(),
+  ];
+
+  @override
+  void dispose() {
+    _questionController.dispose();
+    for (final controller in _optionControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addOption() {
+    if (_optionControllers.length >= 6) {
+      return;
+    }
+
+    setState(() {
+      _optionControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeOption(int index) {
+    if (_optionControllers.length <= 2) {
+      return;
+    }
+
+    setState(() {
+      _optionControllers.removeAt(index).dispose();
+    });
+  }
+
+  void _createPoll() {
+    final question = _questionController.text.trim();
+    final options = _optionControllers
+        .map((controller) => controller.text.trim())
+        .where((option) => option.isNotEmpty)
+        .toList();
+
+    if (question.isEmpty || options.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add a question and at least two options.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.pop(context, _PollDraft(question: question, options: options));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          22,
+          12,
+          22,
+          22 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 52,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: palette.handle,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'Create poll',
+                style: AppStyle.circularTextStyle(
+                  size: 24,
+                  weight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _questionController,
+                decoration: _pollInputDecoration(
+                  context,
+                  label: 'Question',
+                  icon: Icons.help_outline_rounded,
+                ),
+              ),
+              const SizedBox(height: 16),
+              for (var i = 0; i < _optionControllers.length; i++) ...[
+                TextField(
+                  controller: _optionControllers[i],
+                  decoration: _pollInputDecoration(
+                    context,
+                    label: 'Option ${i + 1}',
+                    icon: Icons.radio_button_unchecked_rounded,
+                    suffixIcon: _optionControllers.length <= 2
+                        ? null
+                        : IconButton(
+                            onPressed: () => _removeOption(i),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_optionControllers.length < 6)
+                TextButton.icon(
+                  onPressed: _addOption,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add option'),
+                ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _createPoll,
+                  icon: const Icon(Icons.send_rounded),
+                  label: const Text('Send poll'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _pollInputDecoration(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: colorScheme.primary),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide.none,
       ),
     );
   }
