@@ -23,6 +23,7 @@ class ChatMessageModel {
     this.expiresAt,
     this.translatedText,
     this.translationLanguage,
+    this.transcriptionText,
     this.pollQuestion,
     this.pollOptions = const [],
     this.pollVotes = const {},
@@ -48,6 +49,7 @@ class ChatMessageModel {
   final String? expiresAt;
   final String? translatedText;
   final String? translationLanguage;
+  final String? transcriptionText;
   final String? pollQuestion;
   final List<String> pollOptions;
   final Map<int, List<String>> pollVotes;
@@ -83,6 +85,7 @@ class ChatMessageModel {
     String? expiresAt,
     String? translatedText,
     String? translationLanguage,
+    String? transcriptionText,
     String? pollQuestion,
     List<String>? pollOptions,
     Map<int, List<String>>? pollVotes,
@@ -108,6 +111,7 @@ class ChatMessageModel {
       expiresAt: expiresAt ?? this.expiresAt,
       translatedText: translatedText ?? this.translatedText,
       translationLanguage: translationLanguage ?? this.translationLanguage,
+      transcriptionText: transcriptionText ?? this.transcriptionText,
       pollQuestion: pollQuestion ?? this.pollQuestion,
       pollOptions: pollOptions ?? this.pollOptions,
       pollVotes: pollVotes ?? this.pollVotes,
@@ -175,6 +179,9 @@ class ChatMessageModel {
       expiresAt: expiresAt,
       translatedText: map['translatedText']?.toString(),
       translationLanguage: map['translationLanguage']?.toString(),
+      transcriptionText:
+          map['transcriptionText']?.toString() ??
+          map['transcription']?.toString(),
       pollQuestion: poll.question,
       pollOptions: poll.options,
       pollVotes: poll.votes,
@@ -203,6 +210,7 @@ class ChatMessageModel {
       'expiresAt': expiresAt,
       'translatedText': translatedText,
       'translationLanguage': translationLanguage,
+      'transcriptionText': transcriptionText,
       'pollQuestion': pollQuestion,
       'pollOptions': pollOptions,
       'pollVotes': pollVotes,

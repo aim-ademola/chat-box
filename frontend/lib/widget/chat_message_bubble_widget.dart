@@ -13,12 +13,14 @@ class ChatMessageBubbleWidget extends StatelessWidget {
     this.onLongPress,
     this.onPollVote,
     this.isTranslating = false,
+    this.isTranscribing = false,
   });
 
   final ChatMessageModel message;
   final VoidCallback? onLongPress;
   final ValueChanged<int>? onPollVote;
   final bool isTranslating;
+  final bool isTranscribing;
 
   @override
   Widget build(BuildContext context) {
@@ -144,6 +146,8 @@ class ChatMessageBubbleWidget extends StatelessWidget {
           message: message,
           bubbleColor: bubbleColor,
           textColor: textColor,
+          onLongPress: onLongPress,
+          isTranscribing: isTranscribing,
         );
       case ChatMessageType.image:
         return Container(
@@ -350,11 +354,15 @@ class _VoiceMessageBubble extends StatefulWidget {
     required this.message,
     required this.bubbleColor,
     required this.textColor,
+    required this.onLongPress,
+    required this.isTranscribing,
   });
 
   final ChatMessageModel message;
   final Color bubbleColor;
   final Color textColor;
+  final VoidCallback? onLongPress;
+  final bool isTranscribing;
 
   @override
   State<_VoiceMessageBubble> createState() => _VoiceMessageBubbleState();
@@ -413,68 +421,123 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 360),
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-      decoration: BoxDecoration(
-        color: widget.bubbleColor,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          StreamBuilder<bool>(
-            stream: _player.playingStream,
-            initialData: false,
-            builder: (context, snapshot) {
-              final playing = snapshot.data ?? false;
-              return InkWell(
-                onTap: _toggle,
-                borderRadius: BorderRadius.circular(999),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: widget.message.isMe
-                        ? Colors.white.withValues(alpha: 0.92)
-                        : colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    size: 30,
-                    color: widget.message.isMe
-                        ? colorScheme.primary
-                        : Colors.white,
+    return GestureDetector(
+      onLongPress: widget.onLongPress,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 360),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+        decoration: BoxDecoration(
+          color: widget.bubbleColor,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StreamBuilder<bool>(
+                  stream: _player.playingStream,
+                  initialData: false,
+                  builder: (context, snapshot) {
+                    final playing = snapshot.data ?? false;
+                    return InkWell(
+                      onTap: _toggle,
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: widget.message.isMe
+                              ? Colors.white.withValues(alpha: 0.92)
+                              : colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 30,
+                          color: widget.message.isMe
+                              ? colorScheme.primary
+                              : Colors.white,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 14),
+                ...List.generate(
+                  18,
+                  (index) => Container(
+                    width: 4,
+                    height: 10 + (index % 5) * 4,
+                    margin: const EdgeInsets.only(right: 5),
+                    decoration: BoxDecoration(
+                      color: index > 11
+                          ? widget.textColor.withValues(alpha: 0.35)
+                          : widget.textColor,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
                   ),
                 ),
-              );
-            },
-          ),
-          const SizedBox(width: 14),
-          ...List.generate(
-            18,
-            (index) => Container(
-              width: 4,
-              height: 10 + (index % 5) * 4,
-              margin: const EdgeInsets.only(right: 5),
-              decoration: BoxDecoration(
-                color: index > 11
-                    ? widget.textColor.withValues(alpha: 0.35)
-                    : widget.textColor,
-                borderRadius: BorderRadius.circular(99),
+                Text(
+                  'Voice',
+                  style: AppStyle.circularTextStyle(
+                    size: 16,
+                    weight: FontWeight.w600,
+                    color: widget.textColor,
+                  ),
+                ),
+              ],
+            ),
+            if (widget.isTranscribing ||
+                (widget.message.transcriptionText ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: widget.message.isMe
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : colorScheme.primary.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: widget.isTranscribing
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: widget.textColor,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Transcribing...',
+                            style: AppStyle.circularTextStyle(
+                              size: 14,
+                              weight: FontWeight.w700,
+                              color: widget.textColor,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        widget.message.transcriptionText!,
+                        style: AppStyle.circularTextStyle(
+                          size: 15,
+                          weight: FontWeight.w600,
+                          color: widget.textColor,
+                        ),
+                      ),
               ),
-            ),
-          ),
-          Text(
-            'Voice',
-            style: AppStyle.circularTextStyle(
-              size: 16,
-              weight: FontWeight.w600,
-              color: widget.textColor,
-            ),
-          ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }

@@ -85,6 +85,39 @@
         ]
       }
     },
+    "/ai/chats/{conversationId}/messages/{messageId}/transcribe": {
+      "post": {
+        "summary": "",
+        "tags": [
+          "Default"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter: conversationId"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter: messageId"
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "summary": "",

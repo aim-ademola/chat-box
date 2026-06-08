@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:backend/models/chat_message.dart';
 import 'package:flint_dart/flint_dart.dart';
@@ -226,6 +227,49 @@ class AiService {
     return {
       'translatedText': cleanText,
       'targetLanguage': cleanLanguage,
+      'generatedAt': generatedAt,
+      'source': 'local',
+    };
+  }
+
+  Future<Map<String, dynamic>> transcribeAudio({
+    required String mediaUrl,
+    String? provider,
+  }) async {
+    final cleanMediaUrl = mediaUrl.trim();
+    final generatedAt = DateTime.now().toIso8601String();
+
+    if (cleanMediaUrl.isEmpty) {
+      return {
+        'transcription': '',
+        'generatedAt': generatedAt,
+        'source': 'local',
+      };
+    }
+
+    final selectedProvider = _cleanProvider(provider);
+    if (selectedProvider != 'local') {
+      final audio = await _loadAudioBytes(cleanMediaUrl);
+      if (audio != null && audio.bytes.isNotEmpty) {
+        final transcription = switch (selectedProvider) {
+          'openai' => await _transcribeOpenAi(audio),
+          'gemini' => await _transcribeGemini(audio),
+          _ => null,
+        };
+
+        if (transcription != null && transcription.trim().isNotEmpty) {
+          return {
+            'transcription': transcription.trim(),
+            'generatedAt': generatedAt,
+            'source': selectedProvider,
+          };
+        }
+      }
+    }
+
+    return {
+      'transcription':
+          'AI transcription is not available yet. Configure an AI key and try again.',
       'generatedAt': generatedAt,
       'source': 'local',
     };
@@ -535,6 +579,181 @@ class AiService {
     return chunks.join('\n').trim();
   }
 
+  Future<String?> _transcribeGemini(_AudioInput audio) async {
+    final apiKey = FlintEnv.get('GEMINI_API_KEY', '').trim();
+    if (apiKey.isEmpty) return null;
+
+    final model = FlintEnv.get('GEMINI_MODEL', 'gemini-2.5-flash').trim();
+    final uri = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent',
+    );
+
+    final response = await _postJson(
+      uri,
+      headers: {'x-goog-api-key': apiKey},
+      body: {
+        'contents': [
+          {
+            'role': 'user',
+            'parts': [
+              {
+                'text':
+                    'Transcribe this voice message. Return only the spoken words. If speech is unclear, keep it brief and say what is audible.',
+              },
+              {
+                'inline_data': {
+                  'mime_type': audio.mimeType,
+                  'data': base64Encode(audio.bytes),
+                },
+              },
+            ],
+          },
+        ],
+        'generationConfig': {
+          'temperature': 0.1,
+          'maxOutputTokens': 700,
+        },
+      },
+    );
+
+    final candidates = response['candidates'];
+    if (candidates is! List || candidates.isEmpty) return null;
+
+    final content = candidates.first is Map
+        ? Map<String, dynamic>.from(candidates.first as Map)['content']
+        : null;
+    final parts = content is Map ? content['parts'] : null;
+    if (parts is! List) return null;
+
+    return parts
+        .whereType<Map>()
+        .map((part) => part['text']?.toString() ?? '')
+        .where((text) => text.trim().isNotEmpty)
+        .join('\n')
+        .trim();
+  }
+
+  Future<String?> _transcribeOpenAi(_AudioInput audio) async {
+    final apiKey = FlintEnv.get('OPENAI_API_KEY', '').trim();
+    if (apiKey.isEmpty) return null;
+
+    final model =
+        FlintEnv.get('OPENAI_TRANSCRIPTION_MODEL', 'gpt-4o-mini-transcribe')
+            .trim();
+    final boundary =
+        'chatbox-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(999999)}';
+    final client = HttpClient();
+
+    try {
+      final request = await client.postUrl(
+        Uri.parse('https://api.openai.com/v1/audio/transcriptions'),
+      );
+      request.headers.set('Authorization', 'Bearer $apiKey');
+      request.headers
+          .set('Content-Type', 'multipart/form-data; boundary=$boundary');
+
+      void addField(String name, String value) {
+        request.write('--$boundary\r\n');
+        request.write('Content-Disposition: form-data; name="$name"\r\n\r\n');
+        request.write('$value\r\n');
+      }
+
+      addField('model', model);
+      addField(
+        'prompt',
+        'This is a casual chat voice note. Transcribe only the spoken words.',
+      );
+      request.write('--$boundary\r\n');
+      request.write(
+        'Content-Disposition: form-data; name="file"; filename="${audio.fileName}"\r\n',
+      );
+      request.write('Content-Type: ${audio.mimeType}\r\n\r\n');
+      request.add(audio.bytes);
+      request.write('\r\n--$boundary--\r\n');
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+            'AI transcription failed: ${response.statusCode} $responseBody');
+      }
+
+      final decoded = jsonDecode(responseBody);
+      if (decoded is Map) {
+        return decoded['text']?.toString();
+      }
+    } finally {
+      client.close(force: true);
+    }
+
+    return null;
+  }
+
+  Future<_AudioInput?> _loadAudioBytes(String mediaUrl) async {
+    final uri = Uri.tryParse(mediaUrl);
+    if (uri != null && uri.hasScheme) {
+      return _downloadAudio(uri);
+    }
+
+    final path = mediaUrl.split('?').first.replaceAll('\\', '/');
+    final candidates = [
+      path,
+      path.startsWith('/') ? path.substring(1) : path,
+      path.startsWith('/public/') ? path.substring(1) : 'public/$path',
+    ];
+
+    for (final candidate in candidates) {
+      final file = File(candidate);
+      if (await file.exists()) {
+        final bytes = await file.readAsBytes();
+        return _AudioInput(
+          bytes: bytes,
+          mimeType: _mimeTypeFor(candidate),
+          fileName: candidate.split('/').last,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  Future<_AudioInput?> _downloadAudio(Uri uri) async {
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return null;
+      }
+
+      final bytes = await response.fold<List<int>>(
+        <int>[],
+        (previous, chunk) => previous..addAll(chunk),
+      );
+      final path =
+          uri.pathSegments.isEmpty ? 'voice.m4a' : uri.pathSegments.last;
+      return _AudioInput(
+        bytes: bytes,
+        mimeType: response.headers.contentType?.mimeType ?? _mimeTypeFor(path),
+        fileName: path,
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  String _mimeTypeFor(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.mp3')) return 'audio/mpeg';
+    if (lower.endsWith('.wav')) return 'audio/wav';
+    if (lower.endsWith('.ogg') || lower.endsWith('.oga')) return 'audio/ogg';
+    if (lower.endsWith('.webm')) return 'audio/webm';
+    if (lower.endsWith('.aac')) return 'audio/aac';
+    if (lower.endsWith('.mp4')) return 'audio/mp4';
+    return 'audio/mp4';
+  }
+
   Future<Map<String, dynamic>> _postJson(
     Uri uri, {
     required Map<String, String> headers,
@@ -681,4 +900,16 @@ $text
       return '[$time] $sender: $content';
     }).join('\n');
   }
+}
+
+class _AudioInput {
+  const _AudioInput({
+    required this.bytes,
+    required this.mimeType,
+    required this.fileName,
+  });
+
+  final List<int> bytes;
+  final String mimeType;
+  final String fileName;
 }

@@ -41,6 +41,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final List<ChatMessageModel> _messages = [];
   final Set<String> _translatingMessageKeys = {};
+  final Set<String> _transcribingMessageKeys = {};
   Timer? _readTickTimer;
 
   FlintWebSocketClient? _socket;
@@ -719,6 +720,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   Future<void> _openMessageActions(ChatMessageModel message) async {
+    if (message.type == ChatMessageType.voice) {
+      await _openVoiceMessageActions(message);
+      return;
+    }
+
     final text = message.text?.trim();
     if (text == null || text.isEmpty) {
       return;
@@ -741,6 +747,71 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     }
 
     await _translateMessage(message, language);
+  }
+
+  Future<void> _openVoiceMessageActions(ChatMessageModel message) async {
+    final canTranscribe =
+        message.id?.trim().isNotEmpty == true &&
+        message.mediaUrl?.trim().isNotEmpty == true;
+    if (!canTranscribe) {
+      _showSnackBar('This voice message is still syncing.');
+      return;
+    }
+
+    final shouldTranscribe = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => const _VoiceTranscriptionSheet(),
+    );
+
+    if (shouldTranscribe != true) {
+      return;
+    }
+
+    await _transcribeVoiceMessage(message);
+  }
+
+  Future<void> _transcribeVoiceMessage(ChatMessageModel message) async {
+    final roomId = _roomId;
+    final messageId = message.id?.trim();
+    if (roomId == null || messageId == null || messageId.isEmpty) {
+      _showSnackBar('This voice message is still syncing.');
+      return;
+    }
+
+    final key = _messageKey(message);
+    if (_transcribingMessageKeys.contains(key)) {
+      return;
+    }
+
+    setState(() {
+      _transcribingMessageKeys.add(key);
+    });
+
+    try {
+      final transcription = await ref
+          .read(aiRepositryProvider)
+          .transcribeVoiceMessage(
+            conversationId: roomId,
+            messageId: messageId,
+            provider: 'gemini',
+          );
+
+      if (!mounted) return;
+      _updateTranscribedMessage(key: key, transcriptionText: transcription);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Could not transcribe this voice message.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _transcribingMessageKeys.remove(key);
+        });
+      }
+    }
   }
 
   Future<void> _translateMessage(
@@ -803,6 +874,29 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           updatedMessage = _messages[i].copyWith(
             translatedText: translatedText,
             translationLanguage: language,
+          );
+          _messages[i] = updatedMessage!;
+          break;
+        }
+      }
+    });
+
+    final message = updatedMessage;
+    if (message != null) {
+      _cacheMessage(message);
+    }
+  }
+
+  void _updateTranscribedMessage({
+    required String key,
+    required String transcriptionText,
+  }) {
+    ChatMessageModel? updatedMessage;
+    setState(() {
+      for (var i = 0; i < _messages.length; i++) {
+        if (_messageKey(_messages[i]) == key) {
+          updatedMessage = _messages[i].copyWith(
+            transcriptionText: transcriptionText,
           );
           _messages[i] = updatedMessage!;
           break;
@@ -1118,7 +1212,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             isTranslating: _translatingMessageKeys.contains(
               _messageKey(message),
             ),
-            onMessageLongPress: message.type == ChatMessageType.text
+            isTranscribing: _transcribingMessageKeys.contains(
+              _messageKey(message),
+            ),
+            onMessageLongPress:
+                message.type == ChatMessageType.text ||
+                    message.type == ChatMessageType.voice
                 ? () => _openMessageActions(message)
                 : null,
             onPollVote: message.type == ChatMessageType.poll
@@ -1524,6 +1623,95 @@ class _MessageTranslationSheet extends StatelessWidget {
                     backgroundColor: palette.messageSheet,
                   ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceTranscriptionSheet extends StatelessWidget {
+  const _VoiceTranscriptionSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 52,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: palette.handle,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.graphic_eq_rounded,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Voice to text',
+                        style: AppStyle.circularTextStyle(
+                          size: 22,
+                          weight: FontWeight.w800,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Use AI to write out this voice message.',
+                        style: AppStyle.circularTextStyle(
+                          size: 13,
+                          weight: FontWeight.w600,
+                          color: palette.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Transcribe'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

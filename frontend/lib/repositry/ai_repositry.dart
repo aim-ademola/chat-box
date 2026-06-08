@@ -76,6 +76,28 @@ class AiRepositry {
 
     return data['translatedText']?.toString() ?? text;
   }
+
+  Future<String> transcribeVoiceMessage({
+    required String conversationId,
+    required String messageId,
+    required String provider,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/ai/chats/$conversationId/messages/$messageId/transcribe',
+      headers: headers,
+      body: {'provider': provider},
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final rawData = responseData is Map ? responseData['data'] : null;
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+
+    return data['transcription']?.toString() ?? '';
+  }
 }
 
 final aiRepositryProvider = Provider<AiRepositry>((ref) {

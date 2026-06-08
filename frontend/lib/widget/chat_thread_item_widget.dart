@@ -14,6 +14,7 @@ class ChatThreadItemWidget extends StatelessWidget {
     this.onMessageLongPress,
     this.onPollVote,
     this.isTranslating = false,
+    this.isTranscribing = false,
   });
 
   final MessageItemModel contact;
@@ -21,6 +22,7 @@ class ChatThreadItemWidget extends StatelessWidget {
   final VoidCallback? onMessageLongPress;
   final ValueChanged<int>? onPollVote;
   final bool isTranslating;
+  final bool isTranscribing;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +38,7 @@ class ChatThreadItemWidget extends StatelessWidget {
             onLongPress: onMessageLongPress,
             onPollVote: onPollVote,
             isTranslating: isTranslating,
+            isTranscribing: isTranscribing,
           ),
           const SizedBox(height: 10),
           Padding(
@@ -102,6 +105,7 @@ class ChatThreadItemWidget extends StatelessWidget {
                 onLongPress: onMessageLongPress,
                 onPollVote: onPollVote,
                 isTranslating: isTranslating,
+                isTranscribing: isTranscribing,
               ),
               const SizedBox(height: 10),
               Padding(

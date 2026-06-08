@@ -22,5 +22,9 @@ class AiRoutes extends RouteGroup {
       '/chats/:conversationId/translate',
       AuthMiddleware().handle(controller.translateMessage),
     );
+    app.post(
+      '/chats/:conversationId/messages/:messageId/transcribe',
+      AuthMiddleware().handle(controller.transcribeMessage),
+    );
   }
 }

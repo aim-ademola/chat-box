@@ -187,6 +187,79 @@ class AiController {
     });
   }
 
+  Future<Response?> transcribeMessage(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({
+        'status': false,
+        'message': 'Unauthorized',
+      });
+    }
+
+    final conversationId = ctx.req.param('conversationId');
+    final messageId = ctx.req.param('messageId');
+    if (conversationId == null || conversationId.trim().isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Conversation id is required',
+      });
+    }
+
+    if (messageId == null || messageId.trim().isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Message id is required',
+      });
+    }
+
+    final body = await ctx.req.json();
+    final provider = body['provider']?.toString().trim();
+    final cleanConversationId = conversationId.trim();
+    final cleanMessageId = messageId.trim();
+
+    final message = await ChatMessage().find(cleanMessageId);
+    if (message == null || message.conversationId != cleanConversationId) {
+      return res.status(404).json({
+        'status': false,
+        'message': 'Voice message was not found',
+      });
+    }
+
+    if ((message.messageType ?? '').trim().toLowerCase() != 'voice') {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Only voice messages can be transcribed',
+      });
+    }
+
+    final canAccess =
+        await _canAccessConversation(cleanConversationId, user.id);
+
+    if (!canAccess) {
+      return res.status(403).json({
+        'status': false,
+        'message': 'You cannot transcribe this conversation',
+      });
+    }
+
+    final transcription = await _aiService.transcribeAudio(
+      mediaUrl: message.content ?? '',
+      provider: provider,
+    );
+
+    return res.json({
+      'status': true,
+      'data': {
+        'conversationId': cleanConversationId,
+        'messageId': cleanMessageId,
+        ...transcription,
+      },
+    });
+  }
+
   Future<List<ChatMessage>> _conversationMessages(
     String conversationId,
   ) async {
