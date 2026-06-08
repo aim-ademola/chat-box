@@ -11,10 +11,14 @@ class ChatThreadItemWidget extends StatelessWidget {
     super.key,
     required this.contact,
     required this.message,
+    this.onMessageLongPress,
+    this.isTranslating = false,
   });
 
   final MessageItemModel contact;
   final ChatMessageModel message;
+  final VoidCallback? onMessageLongPress;
+  final bool isTranslating;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +29,11 @@ class ChatThreadItemWidget extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          ChatMessageBubbleWidget(message: message),
+          ChatMessageBubbleWidget(
+            message: message,
+            onLongPress: onMessageLongPress,
+            isTranslating: isTranslating,
+          ),
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.only(right: 4),
@@ -86,7 +94,11 @@ class ChatThreadItemWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
               ],
-              ChatMessageBubbleWidget(message: message),
+              ChatMessageBubbleWidget(
+                message: message,
+                onLongPress: onMessageLongPress,
+                isTranslating: isTranslating,
+              ),
               const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.only(left: 6),

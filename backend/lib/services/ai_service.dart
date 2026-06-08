@@ -176,6 +176,61 @@ class AiService {
     );
   }
 
+  Future<Map<String, dynamic>> translateText({
+    required String text,
+    required String targetLanguage,
+    String? provider,
+  }) async {
+    final cleanText = text.trim();
+    final cleanLanguage = targetLanguage.trim();
+    final generatedAt = DateTime.now().toIso8601String();
+
+    if (cleanText.isEmpty) {
+      return {
+        'translatedText': '',
+        'targetLanguage': cleanLanguage,
+        'generatedAt': generatedAt,
+        'source': 'local',
+      };
+    }
+
+    if (cleanLanguage.isEmpty) {
+      return {
+        'translatedText': cleanText,
+        'targetLanguage': '',
+        'generatedAt': generatedAt,
+        'source': 'local',
+      };
+    }
+
+    final selectedProvider = _cleanProvider(provider);
+    if (selectedProvider != 'local') {
+      final translated = await _generateText(
+        provider: selectedProvider,
+        prompt: _translationPrompt(
+          text: cleanText,
+          targetLanguage: cleanLanguage,
+        ),
+      );
+
+      if (translated != null && translated.trim().isNotEmpty) {
+        return {
+          'translatedText': translated.trim(),
+          'targetLanguage': cleanLanguage,
+          'generatedAt': generatedAt,
+          'source': selectedProvider,
+        };
+      }
+    }
+
+    return {
+      'translatedText': cleanText,
+      'targetLanguage': cleanLanguage,
+      'generatedAt': generatedAt,
+      'source': 'local',
+    };
+  }
+
   String _summaryText(List<ChatMessage> messages) {
     if (messages.isEmpty) {
       return 'No readable text messages are available in this chat yet.';
@@ -558,6 +613,21 @@ User request: $request
 
 Conversation:
 ${_conversationText(messages)}
+''';
+  }
+
+  String _translationPrompt({
+    required String text,
+    required String targetLanguage,
+  }) {
+    return '''
+Translate this chat message into $targetLanguage.
+Return only the translated message.
+Keep names, links, emoji, punctuation, and chat tone natural.
+Do not add explanations, labels, quotes, or markdown.
+
+Message:
+$text
 ''';
   }
 

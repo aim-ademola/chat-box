@@ -12,6 +12,7 @@ class Conversation extends Model<Conversation> {
   String get lastSenderId => getAttribute('lastSenderId')?.toString() ?? '';
   String get type => getAttribute('type')?.toString() ?? 'direct';
   String get title => getAttribute('title')?.toString() ?? '';
+  String get profilePicUrl => getAttribute('profilePicUrl')?.toString() ?? '';
   String get memberIds => getAttribute('memberIds')?.toString() ?? '';
   String get createdBy => getAttribute('createdBy')?.toString() ?? '';
 
@@ -56,6 +57,11 @@ class Conversation extends Model<Conversation> {
             defaultValue: 'direct',
           ),
           Column(name: 'title', type: ColumnType.string, isNullable: true),
+          Column(
+            name: 'profilePicUrl',
+            type: ColumnType.string,
+            isNullable: true,
+          ),
           Column(name: 'memberIds', type: ColumnType.text, isNullable: true),
           Column(name: 'createdBy', type: ColumnType.string, isNullable: true),
           Column(

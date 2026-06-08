@@ -5,9 +5,16 @@ import 'package:frontend/model/chat_message_model.dart';
 import 'package:frontend/provider/core_provider.dart';
 
 class ChatMessageBubbleWidget extends StatelessWidget {
-  const ChatMessageBubbleWidget({super.key, required this.message});
+  const ChatMessageBubbleWidget({
+    super.key,
+    required this.message,
+    this.onLongPress,
+    this.isTranslating = false,
+  });
 
   final ChatMessageModel message;
+  final VoidCallback? onLongPress;
+  final bool isTranslating;
 
   @override
   Widget build(BuildContext context) {
@@ -22,19 +29,109 @@ class ChatMessageBubbleWidget extends StatelessWidget {
 
     switch (message.type) {
       case ChatMessageType.text:
-        return Container(
-          constraints: const BoxConstraints(maxWidth: 320),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-          decoration: BoxDecoration(
-            color: bubbleColor,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Text(
-            message.text ?? '',
-            style: AppStyle.circularTextStyle(
-              size: 16,
-              weight: FontWeight.w500,
-              color: textColor,
+        return GestureDetector(
+          onLongPress: onLongPress,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.text ?? '',
+                  style: AppStyle.circularTextStyle(
+                    size: 16,
+                    weight: FontWeight.w500,
+                    color: textColor,
+                  ),
+                ),
+                if (isTranslating ||
+                    (message.translatedText ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: message.isMe
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : colorScheme.primary.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.translate_rounded,
+                              size: 15,
+                              color: message.isMe
+                                  ? colorScheme.onPrimary.withValues(
+                                      alpha: 0.82,
+                                    )
+                                  : colorScheme.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isTranslating
+                                  ? 'AI translation'
+                                  : message.translationLanguage ??
+                                        'Translation',
+                              style: AppStyle.circularTextStyle(
+                                size: 12,
+                                weight: FontWeight.w800,
+                                color: message.isMe
+                                    ? colorScheme.onPrimary.withValues(
+                                        alpha: 0.82,
+                                      )
+                                    : colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        if (isTranslating)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: textColor,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Translating...',
+                                style: AppStyle.circularTextStyle(
+                                  size: 14,
+                                  weight: FontWeight.w700,
+                                  color: textColor,
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Text(
+                            message.translatedText!,
+                            style: AppStyle.circularTextStyle(
+                              size: 15,
+                              weight: FontWeight.w600,
+                              color: textColor,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         );

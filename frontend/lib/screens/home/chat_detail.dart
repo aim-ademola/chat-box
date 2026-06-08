@@ -11,9 +11,11 @@ import 'package:frontend/model/message_item_model.dart';
 import 'package:frontend/provider/auth_provider.dart';
 import 'package:frontend/provider/presence_provider.dart';
 import 'package:frontend/provider/recent_chat_provider.dart';
+import 'package:frontend/repositry/ai_repositry.dart';
 import 'package:frontend/repositry/call_repositry.dart';
 import 'package:frontend/repositry/chat_repositry.dart';
 import 'package:frontend/screens/home/active_call_screen.dart';
+import 'package:frontend/screens/home/group_info_screen.dart';
 import 'package:frontend/widget/chat_thread_item_widget.dart';
 import 'package:frontend/widget/ai_conversation_sheet.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
@@ -33,6 +35,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _imagePicker = ImagePicker();
   final List<ChatMessageModel> _messages = [];
+  final Set<String> _translatingMessageKeys = {};
 
   FlintWebSocketClient? _socket;
   WebSocketConnectionState _socketState = WebSocketConnectionState.disconnected;
@@ -42,6 +45,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   String? _historyError;
   String? _fatalError;
   AiSummaryModel? _aiSummary;
+
+  static const List<_TranslationLanguage> _translationLanguages = [
+    _TranslationLanguage('English', 'EN'),
+    _TranslationLanguage('Spanish', 'ES'),
+    _TranslationLanguage('French', 'FR'),
+    _TranslationLanguage('Arabic', 'AR'),
+    _TranslationLanguage('Portuguese', 'PT'),
+    _TranslationLanguage('German', 'DE'),
+    _TranslationLanguage('Hindi', 'HI'),
+    _TranslationLanguage('Yoruba', 'YO'),
+  ];
 
   @override
   void initState() {
@@ -447,6 +461,126 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
+  Future<void> _openGroupInfo() async {
+    if (!widget.contact.isGroup) {
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => GroupInfoScreen(group: widget.contact)),
+    );
+
+    if (mounted) {
+      ref.invalidate(recentChatsProvider);
+    }
+  }
+
+  Future<void> _openMessageActions(ChatMessageModel message) async {
+    final text = message.text?.trim();
+    if (text == null || text.isEmpty) {
+      return;
+    }
+
+    final language = await showModalBottomSheet<_TranslationLanguage>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => _MessageTranslationSheet(
+        message: message,
+        languages: _translationLanguages,
+      ),
+    );
+
+    if (language == null) {
+      return;
+    }
+
+    await _translateMessage(message, language);
+  }
+
+  Future<void> _translateMessage(
+    ChatMessageModel message,
+    _TranslationLanguage language,
+  ) async {
+    final roomId = _roomId;
+    final text = message.text?.trim();
+    if (roomId == null || text == null || text.isEmpty) {
+      _showSnackBar('This message cannot be translated.');
+      return;
+    }
+
+    final key = _messageKey(message);
+    if (_translatingMessageKeys.contains(key)) {
+      return;
+    }
+
+    setState(() {
+      _translatingMessageKeys.add(key);
+    });
+
+    try {
+      final translated = await ref
+          .read(aiRepositryProvider)
+          .translateMessage(
+            conversationId: roomId,
+            text: text,
+            language: language.name,
+            provider: 'gemini',
+          );
+
+      if (!mounted) return;
+      _updateTranslatedMessage(
+        key: key,
+        translatedText: translated,
+        language: language.name,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Could not translate this message.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _translatingMessageKeys.remove(key);
+        });
+      }
+    }
+  }
+
+  void _updateTranslatedMessage({
+    required String key,
+    required String translatedText,
+    required String language,
+  }) {
+    setState(() {
+      for (var i = 0; i < _messages.length; i++) {
+        if (_messageKey(_messages[i]) == key) {
+          _messages[i] = _messages[i].copyWith(
+            translatedText: translatedText,
+            translationLanguage: language,
+          );
+          break;
+        }
+      }
+    });
+  }
+
+  String _messageKey(ChatMessageModel message) {
+    final id = message.id?.trim();
+    if (id != null && id.isNotEmpty) {
+      return id;
+    }
+
+    return [
+      message.conversationId ?? '',
+      message.senderId ?? '',
+      message.sentAt ?? '',
+      message.text ?? '',
+    ].join('|');
+  }
+
   String get _statusLabel {
     if (_fatalError != null) {
       return 'Unavailable';
@@ -689,7 +823,16 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         ),
         const SizedBox(height: 28),
         for (final message in _messages) ...[
-          ChatThreadItemWidget(contact: widget.contact, message: message),
+          ChatThreadItemWidget(
+            contact: widget.contact,
+            message: message,
+            isTranslating: _translatingMessageKeys.contains(
+              _messageKey(message),
+            ),
+            onMessageLongPress: message.type == ChatMessageType.text
+                ? () => _openMessageActions(message)
+                : null,
+          ),
           const SizedBox(height: 28),
         ],
       ],
@@ -861,6 +1004,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       color: colorScheme.onSurface,
                     ),
                   ],
+                  if (widget.contact.isGroup)
+                    _buildHeaderIcon(
+                      icon: Icons.info_outline_rounded,
+                      tooltip: 'Group info',
+                      onPressed: _openGroupInfo,
+                      color: colorScheme.onSurface,
+                    ),
                   _buildAiHeaderMenu(colorScheme),
                 ],
               ),
@@ -919,6 +1069,157 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               ),
             ),
             if (_fatalError == null) _buildComposer(colorScheme, palette),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TranslationLanguage {
+  const _TranslationLanguage(this.name, this.shortCode);
+
+  final String name;
+  final String shortCode;
+}
+
+class _MessageTranslationSheet extends StatelessWidget {
+  const _MessageTranslationSheet({
+    required this.message,
+    required this.languages,
+  });
+
+  final ChatMessageModel message;
+  final List<_TranslationLanguage> languages;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette = Theme.of(context).extension<AppThemeColors>()!;
+    final preview = (message.text ?? '').trim();
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 52,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: palette.handle,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.translate_rounded,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Translate message',
+                        style: AppStyle.circularTextStyle(
+                          size: 21,
+                          weight: FontWeight.w800,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Choose a language for this bubble.',
+                        style: AppStyle.circularTextStyle(
+                          size: 14,
+                          weight: FontWeight.w500,
+                          color: palette.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.36,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: colorScheme.outline.withValues(alpha: 0.08),
+                ),
+              ),
+              child: Text(
+                preview.length > 140
+                    ? '${preview.substring(0, 140)}...'
+                    : preview,
+                style: AppStyle.circularTextStyle(
+                  size: 14,
+                  weight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                  height: 1.35,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final language in languages)
+                  ActionChip(
+                    onPressed: () => Navigator.pop(context, language),
+                    avatar: CircleAvatar(
+                      radius: 13,
+                      backgroundColor: colorScheme.primary.withValues(
+                        alpha: 0.12,
+                      ),
+                      child: Text(
+                        language.shortCode,
+                        style: AppStyle.circularTextStyle(
+                          size: 9,
+                          weight: FontWeight.w900,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    label: Text(language.name),
+                    labelStyle: AppStyle.circularTextStyle(
+                      size: 14,
+                      weight: FontWeight.w700,
+                      color: colorScheme.onSurface,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: colorScheme.outline.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    backgroundColor: palette.messageSheet,
+                  ),
+              ],
+            ),
           ],
         ),
       ),

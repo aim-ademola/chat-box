@@ -122,6 +122,71 @@ class AiController {
     });
   }
 
+  Future<Response?> translateMessage(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({
+        'status': false,
+        'message': 'Unauthorized',
+      });
+    }
+
+    final conversationId = ctx.req.param('conversationId');
+    if (conversationId == null || conversationId.trim().isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Conversation id is required',
+      });
+    }
+
+    final body = await ctx.req.json();
+    final text = body['text']?.toString() ?? '';
+    final language = body['language']?.toString().trim() ?? '';
+    final provider = body['provider']?.toString().trim();
+
+    if (text.trim().isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Message text is required',
+      });
+    }
+
+    if (language.isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Target language is required',
+      });
+    }
+
+    final cleanConversationId = conversationId.trim();
+    final canAccess =
+        await _canAccessConversation(cleanConversationId, user.id);
+
+    if (!canAccess) {
+      return res.status(403).json({
+        'status': false,
+        'message': 'You cannot translate this conversation',
+      });
+    }
+
+    final translation = await _aiService.translateText(
+      text: text,
+      targetLanguage: language,
+      provider: provider,
+    );
+
+    return res.json({
+      'status': true,
+      'data': {
+        'conversationId': cleanConversationId,
+        ...translation,
+      },
+    });
+  }
+
   Future<List<ChatMessage>> _conversationMessages(
     String conversationId,
   ) async {
@@ -139,6 +204,10 @@ class AiController {
   ) async {
     final conversation = await Conversation().find(conversationId);
     if (conversation != null) {
+      if (_isGroupConversation(conversation)) {
+        return _conversationMembers(conversation).contains(currentUserId);
+      }
+
       return conversation.userId == currentUserId ||
           conversation.friendId == currentUserId;
     }
@@ -158,5 +227,18 @@ class AiController {
           message.senderId == currentUserId ||
           message.recipientId == currentUserId,
     );
+  }
+
+  bool _isGroupConversation(Conversation conversation) {
+    return conversation.type.trim().toLowerCase() == 'group';
+  }
+
+  List<String> _conversationMembers(Conversation conversation) {
+    return conversation.memberIds
+        .split(',')
+        .map((memberId) => memberId.trim())
+        .where((memberId) => memberId.isNotEmpty)
+        .toSet()
+        .toList();
   }
 }

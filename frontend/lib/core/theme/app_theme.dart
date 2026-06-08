@@ -17,7 +17,7 @@ class AppTheme {
 
   static const _darkColors = AppThemeColors(
     headerBackground: Color(0xFF103A35),
-    messageSheet: Color(0xFF121918),
+    messageSheet: Color.fromARGB(255, 0, 0, 0),
     secondaryText: Color(0xFF8D9794),
     inactiveIcon: Color(0xFF66706D),
     badge: Color(0xFFFF5A5F),

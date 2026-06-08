@@ -11,7 +11,6 @@ import 'package:frontend/provider/auth_provider.dart';
 import 'package:frontend/provider/recent_chat_provider.dart';
 import 'package:frontend/provider/status_provider.dart';
 import 'package:frontend/screens/home/chat_detail.dart';
-import 'package:frontend/screens/home/create_group_screen.dart';
 import 'package:frontend/screens/home/status_preview.dart';
 import 'package:frontend/screens/home/upload_status.dart';
 import 'package:frontend/widget/circle_icon_button_widget.dart';
@@ -41,16 +40,6 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ChatDetailScreen(contact: message)),
-    );
-    if (mounted) {
-      ref.invalidate(recentChatsProvider);
-    }
-  }
-
-  Future<void> _openCreateGroup() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
     );
     if (mounted) {
       ref.invalidate(recentChatsProvider);
@@ -160,17 +149,6 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Create group',
-                    onPressed: _openCreateGroup,
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withValues(alpha: 0.12),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(48, 48),
-                    ),
-                    icon: const Icon(Icons.groups_2_outlined, size: 26),
-                  ),
-                  const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () async {
                       await ref.read(authProvider.notifier).me();

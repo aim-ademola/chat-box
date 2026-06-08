@@ -101,6 +101,72 @@ class ChatRepositry {
     return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
   }
 
+  Future<Map<String, dynamic>> getGroupDetails(String groupId) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.get(
+      '/chat/groups/$groupId',
+      headers: headers,
+      cacheConfig: CacheConfig(maxAge: Duration.zero),
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final data = responseData is Map ? responseData['data'] : null;
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> updateGroup({
+    required String groupId,
+    String? title,
+    File? profilePic,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/chat/groups/$groupId',
+      headers: headers,
+      files: profilePic == null ? null : {'profile_pic': profilePic},
+      body: {'title': ?title},
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final data = responseData is Map ? responseData['data'] : null;
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> addGroupMembers({
+    required String groupId,
+    required List<String> memberIds,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/chat/groups/$groupId/members',
+      headers: headers,
+      body: {'memberIds': memberIds},
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final data = responseData is Map ? responseData['data'] : null;
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> removeGroupMember({
+    required String groupId,
+    required String memberId,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/chat/groups/$groupId/members/$memberId/remove',
+      headers: headers,
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final data = responseData is Map ? responseData['data'] : null;
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
   Future<ChatMessageModel> sendMedia({
     required String roomId,
     required String currentUserId,

@@ -78,6 +78,9 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
                 RegExp(r'\d+').stringMatch(peer['bio']?.toString() ?? '') ?? '',
               ) ??
               0;
+    final memberIds = peer['memberIds'] is List
+        ? (peer['memberIds'] as List).map((item) => item.toString()).toList()
+        : const <String>[];
 
     return MessageItemModel(
       name: peerName,
@@ -94,6 +97,7 @@ class RecentChatsNotifier extends AsyncNotifier<List<MessageItemModel>> {
       unreadCount: int.tryParse(summary['unreadCount']?.toString() ?? '') ?? 0,
       isGroup: isGroup,
       memberCount: memberCount,
+      memberIds: memberIds,
     );
   }
 

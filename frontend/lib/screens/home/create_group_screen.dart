@@ -98,8 +98,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       avatarColor: const Color(0xFFD9E8E5),
       statusColor: const Color(0xFF24786D),
       conversationId: summary['conversationId']?.toString(),
+      profilePicUrl: peer['profilePicUrl']?.toString(),
       isGroup: true,
       memberCount: memberIds.length,
+      memberIds: memberIds.map((memberId) => memberId.toString()).toList(),
     );
   }
 

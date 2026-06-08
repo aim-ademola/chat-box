@@ -14,6 +14,7 @@ class MessageItemModel {
     this.unreadCount = 0,
     this.isGroup = false,
     this.memberCount = 0,
+    this.memberIds = const [],
   });
 
   final String name;
@@ -28,6 +29,7 @@ class MessageItemModel {
   final int unreadCount;
   final bool isGroup;
   final int memberCount;
+  final List<String> memberIds;
 
   MessageItemModel copyWith({
     String? name,
@@ -42,6 +44,7 @@ class MessageItemModel {
     int? unreadCount,
     bool? isGroup,
     int? memberCount,
+    List<String>? memberIds,
   }) {
     return MessageItemModel(
       name: name ?? this.name,
@@ -56,6 +59,7 @@ class MessageItemModel {
       unreadCount: unreadCount ?? this.unreadCount,
       isGroup: isGroup ?? this.isGroup,
       memberCount: memberCount ?? this.memberCount,
+      memberIds: memberIds ?? this.memberIds,
     );
   }
 }

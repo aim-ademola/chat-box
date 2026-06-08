@@ -75,6 +75,190 @@ class ChatController {
     });
   }
 
+  Future<Response?> groupDetails(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({
+        'status': false,
+        'message': 'Unauthorized',
+      });
+    }
+
+    final groupId = ctx.req.param('groupId')?.trim();
+    if (groupId == null || groupId.isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Group id is required',
+      });
+    }
+
+    final group = await Conversation().find(groupId);
+    if (group == null || !_isGroupConversation(group)) {
+      return res.status(404).json({
+        'status': false,
+        'message': 'Group not found',
+      });
+    }
+
+    if (!_conversationMembers(group).contains(user.id)) {
+      return res.status(403).json({
+        'status': false,
+        'message': 'You are not a member of this group',
+      });
+    }
+
+    return res.json({
+      'status': true,
+      'data': await _groupDetailsMap(group, currentUserId: user.id),
+    });
+  }
+
+  Future<Response?> updateGroup(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({
+        'status': false,
+        'message': 'Unauthorized',
+      });
+    }
+
+    final group = await _editableGroup(ctx, user.id);
+    if (group == null) {
+      return res.status(404).json({
+        'status': false,
+        'message': 'Group not found',
+      });
+    }
+
+    final hasUpload = await ctx.req.hasFile('profile_pic');
+    final data = hasUpload
+        ? Map<String, dynamic>.from(await ctx.req.form())
+        : await ctx.req.json();
+    final updateData = <String, dynamic>{};
+    final title = data['title']?.toString().trim();
+
+    if (title != null && title.isNotEmpty) {
+      updateData['title'] = title;
+    }
+
+    if (hasUpload) {
+      final file = await ctx.req.file('profile_pic');
+      if (file != null) {
+        final existingUrl = group.profilePicUrl.trim();
+        updateData['profilePicUrl'] = existingUrl.isEmpty
+            ? await Storage.create(file, subdirectory: 'groups')
+            : await Storage.update(
+                existingUrl,
+                file,
+                subdirectory: 'groups',
+              );
+      }
+    }
+
+    if (updateData.isNotEmpty) {
+      await group.update(data: updateData);
+    }
+
+    final updated = await Conversation().find(group.id);
+    return res.json({
+      'status': true,
+      'data': await _groupDetailsMap(updated ?? group, currentUserId: user.id),
+    });
+  }
+
+  Future<Response?> addGroupMembers(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({
+        'status': false,
+        'message': 'Unauthorized',
+      });
+    }
+
+    final group = await _editableGroup(ctx, user.id);
+    if (group == null) {
+      return res.status(404).json({
+        'status': false,
+        'message': 'Group not found',
+      });
+    }
+
+    final body = await ctx.req.json();
+    final rawMemberIds = body['memberIds'];
+    final nextMembers = <String>{
+      ..._conversationMembers(group),
+      if (rawMemberIds is List)
+        ...rawMemberIds
+            .map((memberId) => memberId.toString().trim())
+            .where((memberId) => memberId.isNotEmpty),
+    }.toList()
+      ..sort();
+
+    await group.update(data: {'memberIds': nextMembers.join(',')});
+    final updated = await Conversation().find(group.id);
+    return res.json({
+      'status': true,
+      'data': await _groupDetailsMap(updated ?? group, currentUserId: user.id),
+    });
+  }
+
+  Future<Response?> removeGroupMember(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({
+        'status': false,
+        'message': 'Unauthorized',
+      });
+    }
+
+    final group = await _editableGroup(ctx, user.id);
+    if (group == null) {
+      return res.status(404).json({
+        'status': false,
+        'message': 'Group not found',
+      });
+    }
+
+    final memberId = ctx.req.param('memberId')?.trim();
+    if (memberId == null || memberId.isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Member id is required',
+      });
+    }
+
+    final members = _conversationMembers(group)
+        .where((currentMemberId) => currentMemberId != memberId)
+        .toList()
+      ..sort();
+
+    if (members.length < 2) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'A group needs at least two members',
+      });
+    }
+
+    await group.update(data: {'memberIds': members.join(',')});
+    final updated = await Conversation().find(group.id);
+    return res.json({
+      'status': true,
+      'data': await _groupDetailsMap(updated ?? group, currentUserId: user.id),
+    });
+  }
+
   Future<Response?> history(Context ctx) async {
     final res = ctx.res;
     if (res == null) return null;
@@ -165,7 +349,7 @@ class ChatController {
                   ? 'Group chat'
                   : conversation.title,
               'bio': '${_conversationMembers(conversation).length} members',
-              'profilePicUrl': '',
+              'profilePicUrl': conversation.profilePicUrl,
               'presence': 'group',
               'isGroup': true,
               'memberIds': _conversationMembers(conversation),
@@ -813,6 +997,25 @@ class ChatController {
     return conversation.userId == userId || conversation.friendId == userId;
   }
 
+  Future<Conversation?> _editableGroup(Context ctx, String userId) async {
+    final groupId = ctx.req.param('groupId')?.trim();
+    if (groupId == null || groupId.isEmpty) {
+      return null;
+    }
+
+    final group = await Conversation().find(groupId);
+    if (group == null || !_isGroupConversation(group)) {
+      return null;
+    }
+
+    final members = _conversationMembers(group);
+    if (!members.contains(userId)) {
+      return null;
+    }
+
+    return group;
+  }
+
   Future<ChatMessage?> _lastMessageFor(Conversation conversation) async {
     final lastMessageId = conversation.lastMessageId.trim();
     if (lastMessageId.isNotEmpty) {
@@ -855,7 +1058,7 @@ class ChatController {
             ? 'Group chat'
             : conversation.title,
         'bio': '${_conversationMembers(conversation).length} members',
-        'profilePicUrl': '',
+        'profilePicUrl': conversation.profilePicUrl,
         'presence': 'group',
         'isGroup': true,
         'memberIds': _conversationMembers(conversation),
@@ -863,6 +1066,33 @@ class ChatController {
       'lastMessage': _systemLastMessage(conversation, currentUserId),
       'unreadCount': 0,
       'sentAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  Future<Map<String, dynamic>> _groupDetailsMap(
+    Conversation conversation, {
+    required String currentUserId,
+  }) async {
+    final memberIds = _conversationMembers(conversation);
+    final members = <Map<String, dynamic>>[];
+
+    for (final memberId in memberIds) {
+      final member = await User().find(memberId);
+      if (member != null) {
+        members.add(member.toMap());
+      }
+    }
+
+    return {
+      ..._groupConversationMap(conversation, currentUserId: currentUserId),
+      'id': conversation.id,
+      'title':
+          conversation.title.trim().isEmpty ? 'Group chat' : conversation.title,
+      'profilePicUrl': conversation.profilePicUrl,
+      'memberIds': memberIds,
+      'members': members,
+      'createdBy': conversation.createdBy,
+      'isOwner': conversation.createdBy == currentUserId,
     };
   }
 

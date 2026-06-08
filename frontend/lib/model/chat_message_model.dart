@@ -17,6 +17,8 @@ class ChatMessageModel {
     this.senderProfilePicUrl,
     this.sentAt,
     this.readAt,
+    this.translatedText,
+    this.translationLanguage,
   });
 
   final String? id;
@@ -34,6 +36,8 @@ class ChatMessageModel {
   final String? senderProfilePicUrl;
   final String? sentAt;
   final String? readAt;
+  final String? translatedText;
+  final String? translationLanguage;
 
   bool get isRead => readAt != null && readAt!.trim().isNotEmpty;
 
@@ -53,6 +57,8 @@ class ChatMessageModel {
     String? senderProfilePicUrl,
     String? sentAt,
     String? readAt,
+    String? translatedText,
+    String? translationLanguage,
   }) {
     return ChatMessageModel(
       id: id ?? this.id,
@@ -70,6 +76,8 @@ class ChatMessageModel {
       senderProfilePicUrl: senderProfilePicUrl ?? this.senderProfilePicUrl,
       sentAt: sentAt ?? this.sentAt,
       readAt: readAt ?? this.readAt,
+      translatedText: translatedText ?? this.translatedText,
+      translationLanguage: translationLanguage ?? this.translationLanguage,
     );
   }
 
@@ -137,6 +145,8 @@ class ChatMessageModel {
       'senderProfilePicUrl': senderProfilePicUrl,
       'sentAt': sentAt,
       'readAt': readAt,
+      'translatedText': translatedText,
+      'translationLanguage': translationLanguage,
     };
   }
 

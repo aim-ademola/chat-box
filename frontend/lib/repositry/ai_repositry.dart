@@ -53,6 +53,29 @@ class AiRepositry {
 
     return data['answer']?.toString() ?? 'No answer available.';
   }
+
+  Future<String> translateMessage({
+    required String conversationId,
+    required String text,
+    required String language,
+    required String provider,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/ai/chats/$conversationId/translate',
+      headers: headers,
+      body: {'text': text, 'language': language, 'provider': provider},
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final rawData = responseData is Map ? responseData['data'] : null;
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+
+    return data['translatedText']?.toString() ?? text;
+  }
 }
 
 final aiRepositryProvider = Provider<AiRepositry>((ref) {
