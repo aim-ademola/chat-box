@@ -635,13 +635,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   Future<void> _startCall(String callType) async {
-    final recipientId = widget.contact.userId;
+    final recipientId = widget.contact.isGroup ? _roomId : widget.contact.userId;
     final roomId = _roomId;
 
     if (recipientId == null || recipientId.trim().isEmpty) {
       _showSnackBar(
         widget.contact.isGroup
-            ? 'Group calls are not available yet.'
+            ? 'Chat is still loading.'
             : 'This contact cannot receive calls yet.',
       );
       return;
@@ -1535,20 +1535,19 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       ],
                     ),
                   ),
-                  if (!widget.contact.isGroup) ...[
-                    _buildHeaderIcon(
-                      icon: Icons.call_outlined,
-                      tooltip: 'Audio call',
-                      onPressed: _startAudioCall,
-                      color: colorScheme.onSurface,
-                    ),
-                    _buildHeaderIcon(
-                      icon: Icons.videocam_outlined,
-                      tooltip: 'Video call',
-                      onPressed: _startVideoCall,
-                      color: colorScheme.onSurface,
-                    ),
-                  ],
+                  _buildHeaderIcon(
+                    icon: Icons.call_outlined,
+                    tooltip: 'Audio call',
+                    onPressed: _startAudioCall,
+                    color: colorScheme.onSurface,
+                  ),
+                  _buildHeaderIcon(
+                    icon: Icons.videocam_outlined,
+                    tooltip: 'Video call',
+                    onPressed: _startVideoCall,
+                    color: colorScheme.onSurface,
+                    // If visual elements look better side by side:
+                  ),
                   if (widget.contact.isGroup)
                     _buildHeaderIcon(
                       icon: Icons.info_outline_rounded,

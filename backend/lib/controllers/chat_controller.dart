@@ -669,7 +669,10 @@ class ChatController {
             {
               'conversationId': conversationKey,
               'message': storedMap,
-              'unreadCount': 0,
+              'unreadCount': await _unreadCount(
+                conversationId: conversationKey,
+                userId: memberId,
+              ),
             },
           );
         }
@@ -1024,14 +1027,25 @@ class ChatController {
     required String conversationId,
     required String userId,
   }) async {
-    final messages = await ChatMessage()
-        .where('conversationId', conversationId)
-        .where('recipientId', userId)
-        .get();
+    final conversation = await Conversation().find(conversationId);
+    final isGroup = conversation != null && _isGroupConversation(conversation);
+
+    final query = ChatMessage().where('conversationId', conversationId);
+    if (!isGroup) {
+      query.where('recipientId', userId);
+    }
+
+    final messages = await query.get();
 
     return messages.where((message) {
       if (_isExpired(message)) {
         return false;
+      }
+
+      if (isGroup) {
+        if (message.senderId == userId) {
+          return false;
+        }
       }
 
       final readAt = message.readAt?.trim() ?? '';

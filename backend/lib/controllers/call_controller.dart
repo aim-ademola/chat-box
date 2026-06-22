@@ -1,5 +1,6 @@
 import 'package:backend/helper/auth_helper.dart';
 import 'package:backend/models/call.dart';
+import 'package:backend/models/conversation.dart';
 import 'package:backend/models/user_model.dart';
 import 'package:backend/services/agora_token_service.dart';
 import 'package:backend/services/ai_service.dart';
@@ -30,39 +31,51 @@ class CallController {
     final conversationId = body['conversationId']?.toString().trim();
     final callType = _cleanCallType(body['callType']?.toString());
 
-    if (recipientId == null || recipientId.isEmpty) {
-      return res.status(400).json({
-        'status': false,
-        'message': 'Recipient id is required',
-      });
+    Conversation? conversation;
+    bool isGroupCall = false;
+    if (conversationId != null && conversationId.isNotEmpty) {
+      conversation = await Conversation().find(conversationId);
+      if (conversation != null && conversation.type.trim().toLowerCase() == 'group') {
+        isGroupCall = true;
+      }
     }
 
-    if (recipientId == user.id) {
-      return res.status(400).json({
-        'status': false,
-        'message': 'You cannot call yourself',
-      });
-    }
+    if (!isGroupCall) {
+      if (recipientId == null || recipientId.isEmpty) {
+        return res.status(400).json({
+          'status': false,
+          'message': 'Recipient id is required',
+        });
+      }
 
-    final recipient = await User().find(recipientId);
-    if (recipient == null) {
-      return res.status(404).json({
-        'status': false,
-        'message': 'Recipient was not found',
-      });
+      if (recipientId == user.id) {
+        return res.status(400).json({
+          'status': false,
+          'message': 'You cannot call yourself',
+        });
+      }
+
+      final recipient = await User().find(recipientId);
+      if (recipient == null) {
+        return res.status(404).json({
+          'status': false,
+          'message': 'Recipient was not found',
+        });
+      }
     }
 
     final startedAt = DateTime.now();
     final callerUid = _tokenService.uidForUser(user.id);
-    final recipientUid = _tokenService.uidForUser(recipientId);
-    final channelName =
-        'call${callerUid}x${recipientUid}x${startedAt.millisecondsSinceEpoch}';
+    final recipientUid = isGroupCall ? 0 : _tokenService.uidForUser(recipientId!);
+    final channelName = isGroupCall
+        ? 'call_group_${conversation!.id}_${startedAt.millisecondsSinceEpoch}'
+        : 'call${callerUid}x${recipientUid}x${startedAt.millisecondsSinceEpoch}';
 
     final created = await Call().create({
       'conversationId': conversationId?.isEmpty == true ? null : conversationId,
       'channelName': channelName,
       'callerId': user.id,
-      'recipientId': recipientId,
+      'recipientId': isGroupCall ? conversationId! : recipientId!,
       'callType': callType,
       'status': 'ringing',
       'startedAt': startedAt.toIso8601String(),
@@ -87,15 +100,30 @@ class CallController {
       uid: callerUid,
     );
     final payload = await _callPayload(call, currentUserId: user.id);
+    
     final recipientPayload = await _callPayload(
       call,
-      currentUserId: recipientId,
+      currentUserId: isGroupCall ? conversationId! : recipientId!,
     );
 
-    _emitToUser(recipientId, 'call:incoming', {
-      'call': recipientPayload,
-      'caller': _userPayload(user),
-    });
+    if (isGroupCall) {
+      final memberIds = conversation!.memberIds
+          .split(',')
+          .map((id) => id.trim())
+          .where((id) => id.isNotEmpty && id != user.id)
+          .toList();
+      for (final memberId in memberIds) {
+        _emitToUser(memberId, 'call:incoming', {
+          'call': recipientPayload,
+          'caller': _userPayload(user),
+        });
+      }
+    } else {
+      _emitToUser(recipientId!, 'call:incoming', {
+        'call': recipientPayload,
+        'caller': _userPayload(user),
+      });
+    }
 
     return res.json({
       'status': true,
@@ -172,7 +200,7 @@ class CallController {
           .json({'status': false, 'message': 'Call not found'});
     }
 
-    if (!_canAccess(call, user.id)) {
+    if (!await _canAccess(call, user.id)) {
       return res.status(403).json({'status': false, 'message': 'Forbidden'});
     }
 
@@ -198,7 +226,7 @@ class CallController {
           .json({'status': false, 'message': 'Call not found'});
     }
 
-    if (!_canAccess(call, user.id)) {
+    if (!await _canAccess(call, user.id)) {
       return res.status(403).json({'status': false, 'message': 'Forbidden'});
     }
 
@@ -236,11 +264,13 @@ class CallController {
           .json({'status': false, 'message': 'Call not found'});
     }
 
-    if (!_canAccess(call, user.id)) {
+    if (!await _canAccess(call, user.id)) {
       return res.status(403).json({'status': false, 'message': 'Forbidden'});
     }
 
-    if (status == 'accepted' && call.recipientId != user.id) {
+    final conversation = call.conversationId != null ? await Conversation().find(call.conversationId!) : null;
+    final isGroup = conversation != null && conversation.type.trim().toLowerCase() == 'group';
+    if (status == 'accepted' && !isGroup && call.recipientId != user.id) {
       return res.status(403).json({
         'status': false,
         'message': 'Only the recipient can accept this call',
@@ -313,6 +343,12 @@ class CallController {
         call.callerId == currentUserId ? call.recipientId : call.callerId;
     final peer = await _peerForPayload(relatedPeer, peerId);
 
+    Conversation? conversation;
+    if (call.conversationId != null) {
+      conversation = await Conversation().find(call.conversationId!);
+    }
+    final isGroup = conversation != null && conversation.type.trim().toLowerCase() == 'group';
+
     return {
       'id': call.id?.toString(),
       'conversationId': call.conversationId,
@@ -329,9 +365,9 @@ class CallController {
       'recordingUrl': call.recordingUrl,
       'transcript': call.transcript,
       'peer': {
-        'id': peer?.id?.toString() ?? peerId,
-        'name': _peerName(peer, peerId),
-        'profilePicUrl': peer?.profilePicUrl,
+        'id': isGroup ? conversation.id : (peer?.id?.toString() ?? peerId),
+        'name': isGroup ? conversation.title : _peerName(peer, peerId),
+        'profilePicUrl': isGroup ? conversation.profilePicUrl : peer?.profilePicUrl,
       },
     };
   }
@@ -344,8 +380,22 @@ class CallController {
     };
   }
 
-  bool _canAccess(Call call, String userId) {
-    return call.callerId == userId || call.recipientId == userId;
+  Future<bool> _canAccess(Call call, String userId) async {
+    if (call.callerId == userId || call.recipientId == userId) {
+      return true;
+    }
+    if (call.conversationId != null) {
+      final conversation = await Conversation().find(call.conversationId!);
+      if (conversation != null && conversation.type.trim().toLowerCase() == 'group') {
+        final members = conversation.memberIds
+            .split(',')
+            .map((id) => id.trim())
+            .where((id) => id.isNotEmpty)
+            .toList();
+        return members.contains(userId);
+      }
+    }
+    return false;
   }
 
   int _uidForCall(Call call, String userId) {
@@ -433,7 +483,7 @@ class CallController {
       });
     }
 
-    if (!_canAccess(call, user.id)) {
+    if (!await _canAccess(call, user.id)) {
       return res.status(403).json({'status': false, 'message': 'Forbidden'});
     }
 

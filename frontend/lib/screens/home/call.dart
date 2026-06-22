@@ -4,6 +4,7 @@ import 'package:frontend/core/constant/app_images.dart';
 import 'package:frontend/core/constant/app_style.dart';
 import 'package:frontend/core/extention/build_context_ext.dart';
 import 'package:frontend/core/theme/theme.dart';
+import 'package:frontend/model/call_item_model.dart';
 import 'package:frontend/provider/call_provider.dart';
 import 'package:frontend/provider/core_provider.dart';
 import 'package:frontend/widget/call_tile_widget.dart';
@@ -483,3 +484,4 @@ class _MeetingSummarySheetState extends State<_MeetingSummarySheet> {
       ),
     );
   }
+}
