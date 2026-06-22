@@ -17,6 +17,8 @@ class CallItemModel {
     this.isMissed = false,
     this.isVideoCall = false,
     this.isIncoming = false,
+    this.recordingUrl,
+    this.transcript,
   });
 
   final String? id;
@@ -31,6 +33,8 @@ class CallItemModel {
   final String? status;
   final String? callType;
   final int? durationSeconds;
+  final String? recordingUrl;
+  final String? transcript;
 
   final bool isMissed;
   final bool isVideoCall;
@@ -60,6 +64,8 @@ class CallItemModel {
       isMissed: status == 'missed' || status == 'rejected',
       isVideoCall: callType == 'video',
       isIncoming: !isOutgoing,
+      recordingUrl: map['recordingUrl']?.toString(),
+      transcript: map['transcript']?.toString(),
     );
   }
 

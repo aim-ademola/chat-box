@@ -17,5 +17,6 @@ class CallRoutes extends RouteGroup {
     app.post('/:id/accept', AuthMiddleware().handle(controller.accept));
     app.post('/:id/reject', AuthMiddleware().handle(controller.reject));
     app.post('/:id/end', AuthMiddleware().handle(controller.end));
+    app.post('/:id/recording', AuthMiddleware().handle(controller.uploadRecording));
   }
 }

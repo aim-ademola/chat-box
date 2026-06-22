@@ -81,6 +81,14 @@ class CallTileWidget extends StatelessWidget {
 
               Row(
                 children: [
+                  if (contact.recordingUrl != null || contact.transcript != null) ...[
+                    Icon(
+                      Icons.auto_awesome,
+                      size: 18,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                   ImageWidget(AppImages.call, color: palette.inactiveIcon),
                   const SizedBox(width: 12),
                   ImageWidget(AppImages.video, color: palette.inactiveIcon),

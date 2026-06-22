@@ -11,12 +11,14 @@ class AiConversationSheet extends ConsumerStatefulWidget {
     super.key,
     required this.conversationId,
     required this.contactName,
+    this.isGroup = false,
     this.initialSummary,
     required this.onSummaryLoaded,
   });
 
   final String conversationId;
   final String contactName;
+  final bool isGroup;
   final AiSummaryModel? initialSummary;
   final ValueChanged<AiSummaryModel> onSummaryLoaded;
 
@@ -431,7 +433,7 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Ask AI',
+                        widget.isGroup ? 'Catch up' : 'Ask AI',
                         style: AppStyle.circularTextStyle(
                           size: 24,
                           weight: FontWeight.w800,

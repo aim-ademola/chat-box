@@ -53,6 +53,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   String? _historyError;
   String? _fatalError;
   AiSummaryModel? _aiSummary;
+  String? _moodLabel;
+  String? _moodEmoji;
+  String? _moodExplanation;
+  bool _loadingMood = false;
 
   static const List<_TranslationLanguage> _translationLanguages = [
     _TranslationLanguage('English', 'EN'),
@@ -153,6 +157,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
       await _connectSocket(chatRepository, roomId);
       _startReadTick();
+      _fetchMood();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -225,6 +230,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         _markOpenConversationRead();
       }
       _scrollToBottom();
+      _fetchMood();
     });
 
     socket.on('chat:poll_updated', (dynamic data) {
@@ -692,6 +698,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         child: AiConversationSheet(
           conversationId: roomId,
           contactName: widget.contact.name,
+          isGroup: widget.contact.isGroup,
           initialSummary: _aiSummary,
           onSummaryLoaded: (summary) {
             if (!mounted) return;
@@ -860,6 +867,93 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         });
       }
     }
+  }
+
+  Future<void> _fetchMood() async {
+    if (widget.contact.isGroup || _roomId == null) return;
+    
+    setState(() {
+      _loadingMood = true;
+    });
+
+    try {
+      final res = await ref.read(aiRepositryProvider).getChatMood(
+        conversationId: _roomId!,
+        provider: 'gemini',
+      );
+      if (!mounted) return;
+      setState(() {
+        _moodLabel = res['mood']?.toString();
+        _moodEmoji = res['emoji']?.toString();
+        _moodExplanation = res['explanation']?.toString();
+        _loadingMood = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMood = false;
+      });
+    }
+  }
+
+  void _showMoodExplanation() {
+    final explanation = _moodExplanation ?? 'No explanation available.';
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Row(
+            children: [
+              Text(_moodEmoji ?? '😐'),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${widget.contact.name}\'s Mood',
+                  style: AppStyle.circularTextStyle(
+                    size: 20,
+                    weight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Current Mood: $_moodLabel',
+                style: AppStyle.circularTextStyle(
+                  size: 16,
+                  weight: FontWeight.w700,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                explanation,
+                style: AppStyle.circularTextStyle(
+                  size: 14,
+                  weight: FontWeight.w500,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _updateTranslatedMessage({
@@ -1105,7 +1199,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             children: [
               Icon(Icons.notes_rounded, size: 20, color: colorScheme.primary),
               const SizedBox(width: 10),
-              const Text('Summarize chat'),
+              Text(widget.contact.isGroup ? 'Catch up' : 'Summarize chat'),
             ],
           ),
         ),
@@ -1383,13 +1477,60 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          _statusLabel,
-                          style: AppStyle.circularTextStyle(
-                            size: 16,
-                            weight: FontWeight.w500,
-                            color: palette.secondaryText,
-                          ),
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          children: [
+                            Text(
+                              _statusLabel,
+                              style: AppStyle.circularTextStyle(
+                                size: 14,
+                                weight: FontWeight.w500,
+                                color: palette.secondaryText,
+                              ),
+                            ),
+                            if (!widget.contact.isGroup && (_moodLabel != null || _loadingMood)) ...[
+                              Text(
+                                '•',
+                                style: AppStyle.circularTextStyle(
+                                  size: 14,
+                                  weight: FontWeight.w500,
+                                  color: palette.secondaryText,
+                                ),
+                              ),
+                              _loadingMood
+                                  ? const SizedBox(
+                                      width: 10,
+                                      height: 10,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                      ),
+                                    )
+                                  : GestureDetector(
+                                      onTap: _showMoodExplanation,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.primary.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'Mood: $_moodLabel $_moodEmoji',
+                                          style: AppStyle.circularTextStyle(
+                                            size: 11,
+                                            weight: FontWeight.w700,
+                                            color: colorScheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                            ],
+                          ],
                         ),
                       ],
                     ),

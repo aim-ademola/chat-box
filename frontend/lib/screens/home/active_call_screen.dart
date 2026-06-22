@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flint_client/flint_client.dart';
@@ -12,7 +13,9 @@ import 'package:frontend/provider/call_provider.dart';
 import 'package:frontend/repositry/call_repositry.dart';
 import 'package:frontend/repositry/chat_repositry.dart';
 import 'package:frontend/widget/user_avatar_widget.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 
 class ActiveCallScreen extends ConsumerStatefulWidget {
   const ActiveCallScreen({super.key, required this.session});
@@ -36,6 +39,10 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   int _durationSeconds = 0;
   Timer? _durationTimer;
 
+  final AudioRecorder _meetingRecorder = AudioRecorder();
+  bool _isRecordingMeeting = false;
+  String? _recordingPath;
+
   bool get _isVideo => widget.session.isVideoCall;
 
   @override
@@ -50,6 +57,7 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
     _durationTimer?.cancel();
     _eventSocket?.dispose();
     _leaveAgora();
+    _meetingRecorder.dispose();
     super.dispose();
   }
 
@@ -220,6 +228,24 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
       _statusText = 'Ending call...';
     });
 
+    if (_isRecordingMeeting) {
+      try {
+        final path = await _meetingRecorder.stop();
+        _isRecordingMeeting = false;
+        if (path != null && path.trim().isNotEmpty) {
+          final file = File(path);
+          if (await file.exists()) {
+            unawaited(
+              ref.read(callRepositryProvider)
+                  .uploadCallRecording(callId: widget.session.id, file: file)
+                  .then((_) => ref.invalidate(recentCallsProvider))
+                  .catchError((_) {})
+            );
+          }
+        }
+      } catch (_) {}
+    }
+
     try {
       await ref.read(callRepositryProvider).endCall(widget.session.id);
       ref.invalidate(recentCallsProvider);
@@ -241,6 +267,24 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
     _closingFromRemote = true;
     _durationTimer?.cancel();
 
+    if (_isRecordingMeeting) {
+      try {
+        final path = await _meetingRecorder.stop();
+        _isRecordingMeeting = false;
+        if (path != null && path.trim().isNotEmpty) {
+          final file = File(path);
+          if (await file.exists()) {
+            unawaited(
+              ref.read(callRepositryProvider)
+                  .uploadCallRecording(callId: widget.session.id, file: file)
+                  .then((_) => ref.invalidate(recentCallsProvider))
+                  .catchError((_) {})
+            );
+          }
+        }
+      } catch (_) {}
+    }
+
     if (mounted) {
       setState(() {
         _statusText = message;
@@ -253,6 +297,70 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
     if (mounted) {
       Navigator.pop(context);
     }
+  }
+
+  Future<void> _toggleMeetingRecording() async {
+    if (_isRecordingMeeting) {
+      await _stopMeetingRecording();
+      return;
+    }
+
+    await _startMeetingRecording();
+  }
+
+  Future<void> _startMeetingRecording() async {
+    final hasPermission = await _meetingRecorder.hasPermission();
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required to record meetings.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final directory = await getTemporaryDirectory();
+      final path = '${directory.path}${Platform.pathSeparator}meeting_rec_${widget.session.id}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      await _meetingRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: path,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isRecordingMeeting = true;
+        _recordingPath = path;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Meeting recording started.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not start recording: $e')),
+      );
+    }
+  }
+
+  Future<void> _stopMeetingRecording() async {
+    try {
+      final path = await _meetingRecorder.stop();
+      if (!mounted) return;
+      setState(() {
+        _isRecordingMeeting = false;
+      });
+      if (path != null && path.trim().isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Meeting recording saved and processing.')),
+        );
+      }
+    } catch (_) {}
   }
 
   void _startDurationTimer() {
@@ -520,6 +628,12 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
                       icon: _muted ? Icons.mic_off : Icons.mic,
                       background: Colors.white24,
                       onPressed: _toggleMute,
+                    ),
+                    const SizedBox(width: 18),
+                    _buildControl(
+                      icon: _isRecordingMeeting ? Icons.fiber_manual_record : Icons.radio_button_checked,
+                      background: _isRecordingMeeting ? Colors.red : Colors.white24,
+                      onPressed: _toggleMeetingRecording,
                     ),
                     if (_isVideo) ...[
                       const SizedBox(width: 18),

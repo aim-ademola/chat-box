@@ -12,6 +12,8 @@ class CallSessionModel {
     this.peerId,
     this.peerProfilePicUrl,
     this.isOutgoing = true,
+    this.recordingUrl,
+    this.transcript,
   });
 
   final String id;
@@ -26,6 +28,8 @@ class CallSessionModel {
   final String? peerId;
   final String? peerProfilePicUrl;
   final bool isOutgoing;
+  final String? recordingUrl;
+  final String? transcript;
 
   bool get isVideoCall => callType == 'video';
 
@@ -47,10 +51,17 @@ class CallSessionModel {
       peerId: peer['id']?.toString(),
       peerProfilePicUrl: peer['profilePicUrl']?.toString(),
       isOutgoing: map['isOutgoing'] == true,
+      recordingUrl: map['recordingUrl']?.toString(),
+      transcript: map['transcript']?.toString(),
     );
   }
 
-  CallSessionModel copyWith({String? peerName, String? peerProfilePicUrl}) {
+  CallSessionModel copyWith({
+    String? peerName,
+    String? peerProfilePicUrl,
+    String? recordingUrl,
+    String? transcript,
+  }) {
     return CallSessionModel(
       id: id,
       conversationId: conversationId,
@@ -64,6 +75,8 @@ class CallSessionModel {
       peerId: peerId,
       peerProfilePicUrl: peerProfilePicUrl ?? this.peerProfilePicUrl,
       isOutgoing: isOutgoing,
+      recordingUrl: recordingUrl ?? this.recordingUrl,
+      transcript: transcript ?? this.transcript,
     );
   }
 }

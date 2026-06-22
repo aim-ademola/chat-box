@@ -63,6 +63,60 @@ class AiController {
     });
   }
 
+  Future<Response?> chatMood(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({
+        'status': false,
+        'message': 'Unauthorized',
+      });
+    }
+
+    final conversationId = ctx.req.param('conversationId');
+    if (conversationId == null || conversationId.trim().isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Conversation id is required',
+      });
+    }
+
+    final cleanConversationId = conversationId.trim();
+    final canAccess =
+        await _canAccessConversation(cleanConversationId, user.id);
+
+    if (!canAccess) {
+      return res.status(403).json({
+        'status': false,
+        'message': 'You cannot access this conversation',
+      });
+    }
+
+    final messages = await ChatMessage()
+        .where('conversationId', cleanConversationId)
+        .withRelation('sender')
+        .orderBy('sentAt', asc: true)
+        .limit(150)
+        .get();
+
+    final provider = ctx.req.queryParam('provider');
+    final moodResult = await _aiService.analyzeConversationMood(
+      messages: messages,
+      currentUserId: user.id,
+      provider: provider,
+    );
+
+    return res.json({
+      'status': true,
+      'data': {
+        'conversationId': cleanConversationId,
+        ...moodResult,
+      },
+    });
+  }
+
   Future<Response?> chatAsk(Context ctx) async {
     final res = ctx.res;
     if (res == null) return null;

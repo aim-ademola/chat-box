@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flint_client/flint_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/model/call_item_model.dart';
@@ -74,6 +75,21 @@ class CallRepositry {
         .whereType<Map>()
         .map((item) => CallItemModel.fromMap(Map<String, dynamic>.from(item)))
         .toList();
+  }
+
+  Future<CallSessionModel> uploadCallRecording({
+    required String callId,
+    required File file,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.post(
+      '/calls/$callId/recording',
+      headers: headers,
+      files: {'file': file},
+    );
+    res.throwIfError();
+
+    return CallSessionModel.fromMap(_responseData(res.data));
   }
 
   Map<String, dynamic> _responseData(dynamic responseData) {

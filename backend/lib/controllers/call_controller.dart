@@ -2,15 +2,19 @@ import 'package:backend/helper/auth_helper.dart';
 import 'package:backend/models/call.dart';
 import 'package:backend/models/user_model.dart';
 import 'package:backend/services/agora_token_service.dart';
+import 'package:backend/services/ai_service.dart';
 import 'package:flint_dart/flint_dart.dart';
+import 'package:flint_dart/storage.dart';
 
 const String _userSocketPath = '/chat/connect';
 
 class CallController {
-  CallController({AgoraTokenService? tokenService})
-      : _tokenService = tokenService ?? AgoraTokenService();
+  CallController({AgoraTokenService? tokenService, AiService? aiService})
+      : _tokenService = tokenService ?? AgoraTokenService(),
+        _aiService = aiService ?? AiService();
 
   final AgoraTokenService _tokenService;
+  final AiService _aiService;
 
   Future<Response?> create(Context ctx) async {
     final res = ctx.res;
@@ -322,6 +326,8 @@ class CallController {
       'endedAt': call.endedAt,
       'durationSeconds': call.durationSeconds,
       'isOutgoing': call.callerId == currentUserId,
+      'recordingUrl': call.recordingUrl,
+      'transcript': call.transcript,
       'peer': {
         'id': peer?.id?.toString() ?? peerId,
         'name': _peerName(peer, peerId),
@@ -400,5 +406,102 @@ class CallController {
       event,
       data,
     );
+  }
+
+  Future<Response?> uploadRecording(Context ctx) async {
+    final res = ctx.res;
+    if (res == null) return null;
+
+    final user = await ctx.req.authUser;
+    if (user == null) {
+      return res.status(401).json({'status': false, 'message': 'Unauthorized'});
+    }
+
+    final callId = ctx.req.param('id');
+    if (callId == null || callId.trim().isEmpty) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Call ID is required',
+      });
+    }
+
+    final call = await Call().find(callId.trim());
+    if (call == null) {
+      return res.status(404).json({
+        'status': false,
+        'message': 'Call not found',
+      });
+    }
+
+    if (!_canAccess(call, user.id)) {
+      return res.status(403).json({'status': false, 'message': 'Forbidden'});
+    }
+
+    if (!await ctx.req.hasFile('file')) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'No recording file uploaded',
+      });
+    }
+
+    final file = await ctx.req.file('file');
+    if (file == null) {
+      return res.status(400).json({
+        'status': false,
+        'message': 'Invalid file',
+      });
+    }
+
+    final url = await Storage.create(file, subdirectory: 'calls');
+    
+    // Perform AI transcription and summarization
+    String transcriptText = 'Meeting recording transcript and summary could not be generated.';
+    try {
+      final transcriptionResult = await _aiService.transcribeAudio(
+        mediaUrl: url,
+        provider: 'gemini',
+      );
+      final rawTranscription = transcriptionResult['transcription']?.toString() ?? '';
+      
+      if (rawTranscription.isNotEmpty && !rawTranscription.contains('AI transcription is not available')) {
+        final prompt = '''
+You are summarizing a recorded call/meeting between two users.
+Please provide a brief, professional meeting summary, highlighting key discussion points, decisions made, and follow-up tasks.
+Format your response in a clean and readable format (markdown is fine, but keep it readable).
+
+Meeting Transcription:
+$rawTranscription
+''';
+        final summary = await _aiService.generateText(
+          prompt: prompt,
+          provider: 'gemini',
+        );
+
+        if (summary != null && summary.trim().isNotEmpty) {
+          transcriptText = 'Meeting Summary:\n${summary.trim()}\n\nFull Transcription:\n$rawTranscription';
+        } else {
+          transcriptText = 'Full Transcription:\n$rawTranscription';
+        }
+      } else {
+        transcriptText = 'Meeting recording uploaded successfully, but transcription is not available. Please verify your Gemini API key.';
+      }
+    } catch (e) {
+      transcriptText = 'An error occurred during transcription: $e';
+    }
+
+    await call.update(data: {
+      'recordingUrl': url,
+      'transcript': transcriptText,
+    });
+
+    final updatedCall = await Call()
+        .withRelation('caller')
+        .withRelation('recipient')
+        .find(call.id);
+
+    return res.json({
+      'status': true,
+      'data': await _callPayload(updatedCall ?? call, currentUserId: user.id),
+    });
   }
 }

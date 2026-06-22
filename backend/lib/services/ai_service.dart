@@ -69,6 +69,16 @@ class AiService {
     };
   }
 
+  Future<String?> generateText({
+    required String prompt,
+    String? provider,
+  }) async {
+    return _generateText(
+      provider: _cleanProvider(provider),
+      prompt: prompt,
+    );
+  }
+
   Future<Map<String, dynamic>> answerChatQuestion({
     required List<ChatMessage> messages,
     required String currentUserId,
@@ -899,6 +909,112 @@ $text
       final content = (message.content ?? '').trim();
       return '[$time] $sender: $content';
     }).join('\n');
+  }
+
+  Future<Map<String, dynamic>> analyzeConversationMood({
+    required List<ChatMessage> messages,
+    required String currentUserId,
+    String? provider,
+  }) async {
+    final defaultResult = {
+      'mood': 'Neutral',
+      'emoji': '😐',
+      'explanation': 'The peer is communicating neutrally or there are not enough messages to determine emotion.',
+    };
+
+    if (messages.isEmpty) {
+      return defaultResult;
+    }
+
+    final selectedProvider = _cleanProvider(provider);
+    if (selectedProvider != 'local') {
+      try {
+        final aiResult = await _generateText(
+          provider: selectedProvider,
+          prompt: _moodPrompt(messages, currentUserId),
+        );
+
+        if (aiResult != null && aiResult.trim().isNotEmpty) {
+          final cleanJson = aiResult.trim().replaceAll(RegExp(r'^```json\s*|```$'), '');
+          final decoded = jsonDecode(cleanJson);
+          if (decoded is Map) {
+            return {
+              'mood': decoded['mood']?.toString() ?? 'Neutral',
+              'emoji': decoded['emoji']?.toString() ?? '😐',
+              'explanation': decoded['explanation']?.toString() ?? 'Communication seems standard.',
+            };
+          }
+        }
+      } catch (_) {
+        // Fall back to local analysis
+      }
+    }
+
+    // Local fallback analysis
+    final peerMessages = messages.where((m) => m.senderId != currentUserId).toList();
+    if (peerMessages.isEmpty) {
+      return defaultResult;
+    }
+
+    final latestContent = peerMessages.last.content?.toLowerCase() ?? '';
+    
+    if (latestContent.contains('sorry') || latestContent.contains('sad') || latestContent.contains('bad') || latestContent.contains('hurt')) {
+      return {
+        'mood': 'Sad',
+        'emoji': '😢',
+        'explanation': 'The peer expressed regret or sadness in their last message.',
+      };
+    }
+    if (latestContent.contains('angry') || latestContent.contains('mad') || latestContent.contains('hate') || latestContent.contains('wtf') || latestContent.contains('annoyed')) {
+      return {
+        'mood': 'Angry',
+        'emoji': '😠',
+        'explanation': 'The peer used strong or annoyed language recently.',
+      };
+    }
+    if (latestContent.contains('happy') || latestContent.contains('great') || latestContent.contains('perfect') || latestContent.contains('awesome') || latestContent.contains('thanks') || latestContent.contains('thank you')) {
+      return {
+        'mood': 'Happy',
+        'emoji': '😊',
+        'explanation': 'The peer expressed gratitude or positive feelings.',
+      };
+    }
+    if (latestContent.contains('wow') || latestContent.contains('omg') || latestContent.contains('excited') || latestContent.contains('yay')) {
+      return {
+        'mood': 'Excited',
+        'emoji': '😆',
+        'explanation': 'The peer used excited or high-energy language.',
+      };
+    }
+    if (latestContent.contains('worry') || latestContent.contains('anxious') || latestContent.contains('scared') || latestContent.contains('nervous') || latestContent.contains('stress')) {
+      return {
+        'mood': 'Anxious',
+        'emoji': '😰',
+        'explanation': 'The peer mentioned worry, stress, or anxiety.',
+      };
+    }
+
+    return defaultResult;
+  }
+
+  String _moodPrompt(List<ChatMessage> messages, String currentUserId) {
+    return '''
+You are analyzing the mood/sentiment of the chat partner (the person who is not $currentUserId) in this conversation.
+Analyze their latest messages and identify their current emotional state.
+Choose exactly one of these moods: Angry, Happy, Neutral, Sad, Excited, Anxious.
+Choose the corresponding emoji: 😠 (Angry), 😊 (Happy), 😐 (Neutral), 😢 (Sad), 😆 (Excited), 😰 (Anxious).
+Provide a brief, single-sentence explanation of why they are in that mood based on their messages.
+
+Return ONLY a valid JSON object with the following fields (no markdown, no other text):
+{
+  "mood": "mood name",
+  "emoji": "corresponding emoji",
+  "explanation": "your brief explanation"
+}
+
+Conversation:
+${_conversationText(messages)}
+''';
   }
 }
 

@@ -98,6 +98,26 @@ class AiRepositry {
 
     return data['transcription']?.toString() ?? '';
   }
+
+  Future<Map<String, dynamic>> getChatMood({
+    required String conversationId,
+    required String provider,
+  }) async {
+    final headers = await authRepository.authHeaders();
+    final res = await client.get(
+      '/ai/chats/$conversationId/mood',
+      headers: headers,
+      queryParameters: {'provider': provider},
+      cacheConfig: CacheConfig(maxAge: Duration.zero),
+    );
+    res.throwIfError();
+
+    final responseData = res.data;
+    final rawData = responseData is Map ? responseData['data'] : null;
+    return rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+  }
 }
 
 final aiRepositryProvider = Provider<AiRepositry>((ref) {
