@@ -36,7 +36,7 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
   bool _loadingSummary = true;
   bool _asking = false;
   String? _error;
-  String _provider = 'gemini';
+  final String _provider = 'gemini';
   String _activeTab = 'summary';
 
   @override
