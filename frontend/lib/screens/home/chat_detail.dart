@@ -1173,67 +1173,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
-  Widget _buildAiHeaderMenu(ColorScheme colorScheme) {
-    return PopupMenuButton<String>(
-      tooltip: 'AI tools',
-      icon: Icon(
-        Icons.auto_awesome_rounded,
-        size: 28,
-        color: colorScheme.primary,
-      ),
-      onSelected: (value) {
-        switch (value) {
-          case 'summary':
-            _openAiSheet();
-            break;
-          case 'reply':
-          case 'meeting':
-            _openAiSheet();
-            break;
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: 'summary',
-          child: Row(
-            children: [
-              Icon(Icons.notes_rounded, size: 20, color: colorScheme.primary),
-              const SizedBox(width: 10),
-              Text(widget.contact.isGroup ? 'Catch up' : 'Summarize chat'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'reply',
-          child: Row(
-            children: [
-              Icon(
-                Icons.mark_chat_unread_outlined,
-                size: 20,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 10),
-              const Text('Need reply'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'meeting',
-          child: Row(
-            children: [
-              Icon(
-                Icons.event_available_outlined,
-                size: 20,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 10),
-              const Text('Possible meeting'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+
 
   Widget _buildEmptyState(ColorScheme colorScheme, AppThemeColors palette) {
     return Center(
@@ -1555,7 +1495,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       onPressed: _openGroupInfo,
                       color: colorScheme.onSurface,
                     ),
-                  _buildAiHeaderMenu(colorScheme),
+                  _buildHeaderIcon(
+                    icon: Icons.auto_awesome_rounded,
+                    tooltip: 'AI assistant',
+                    onPressed: _openAiSheet,
+                    color: colorScheme.primary,
+                  ),
                 ],
               ),
             ),

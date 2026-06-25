@@ -37,6 +37,7 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
   bool _asking = false;
   String? _error;
   String _provider = 'gemini';
+  String _activeTab = 'summary';
 
   @override
   void initState() {
@@ -152,15 +153,7 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
     );
   }
 
-  Widget _buildSummary(ColorScheme colorScheme, AppThemeColors palette) {
-    if (_loadingSummary) {
-      return Container(
-        height: 112,
-        alignment: Alignment.center,
-        child: CircularProgressIndicator(color: colorScheme.primary),
-      );
-    }
-
+  Widget _buildSummaryCard(ColorScheme colorScheme, AppThemeColors palette) {
     final summary = _summary;
     if (summary == null) {
       return const SizedBox.shrink();
@@ -240,6 +233,336 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
     );
   }
 
+  Widget _buildTabSwitch(ColorScheme colorScheme) {
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<String>(
+        segments: [
+          ButtonSegment(
+            value: 'summary',
+            icon: const Icon(Icons.notes_rounded),
+            label: Text(widget.isGroup ? 'Catch up' : 'Summarize'),
+          ),
+          ButtonSegment(
+            value: 'reply',
+            icon: const Icon(Icons.mark_chat_unread_outlined),
+            label: const Text('Need Reply'),
+          ),
+          ButtonSegment(
+            value: 'meeting',
+            icon: const Icon(Icons.event_available_outlined),
+            label: const Text('Schedule Meet'),
+          ),
+        ],
+        selected: {_activeTab},
+        showSelectedIcon: false,
+        onSelectionChanged: (values) {
+          setState(() {
+            _activeTab = values.first;
+          });
+        },
+        style: SegmentedButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          textStyle: AppStyle.circularTextStyle(
+            size: 13,
+            weight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNeedReplyView(ColorScheme colorScheme, AppThemeColors palette) {
+    final summary = _summary;
+    if (summary == null || summary.openQuestions.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            Icon(
+              Icons.done_all_rounded,
+              size: 48,
+              color: colorScheme.primary.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'All caught up!',
+              style: AppStyle.circularTextStyle(
+                size: 16,
+                weight: FontWeight.w700,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'No unanswered questions found in recent messages.',
+              textAlign: TextAlign.center,
+              style: AppStyle.circularTextStyle(
+                size: 13,
+                weight: FontWeight.w500,
+                color: palette.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'Unanswered Questions',
+            style: AppStyle.circularTextStyle(
+              size: 16,
+              weight: FontWeight.w700,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ),
+        for (final question in summary.openQuestions)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.38),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: colorScheme.outline.withValues(alpha: 0.08),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 12,
+                      backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                      child: Text(
+                        _initials(question['senderName']?.toString() ?? 'U'),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      question['senderName']?.toString() ?? 'Sender',
+                      style: AppStyle.circularTextStyle(
+                        size: 13,
+                        weight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  question['content']?.toString() ?? '',
+                  style: AppStyle.circularTextStyle(
+                    size: 14,
+                    weight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        final content = question['content']?.toString() ?? '';
+                        setState(() {
+                          _activeTab = 'summary';
+                        });
+                        _askQuestion('Help me draft a reply to: "$content"');
+                      },
+                      icon: const Icon(Icons.reply_rounded, size: 16),
+                      label: const Text('Draft Reply'),
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildScheduleMeetView(ColorScheme colorScheme, AppThemeColors palette) {
+    final summary = _summary;
+    if (summary == null || summary.meetingSuggestions.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 48,
+              color: colorScheme.primary.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No meetings suggested',
+              style: AppStyle.circularTextStyle(
+                size: 16,
+                weight: FontWeight.w700,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'No meeting proposals or plans detected in recent messages.',
+              textAlign: TextAlign.center,
+              style: AppStyle.circularTextStyle(
+                size: 13,
+                weight: FontWeight.w500,
+                color: palette.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'Meeting Proposals',
+            style: AppStyle.circularTextStyle(
+              size: 16,
+              weight: FontWeight.w700,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ),
+        for (final suggestion in summary.meetingSuggestions) ...[
+          (() {
+            final source = suggestion['sourceMessage'] is Map
+                ? Map<String, dynamic>.from(suggestion['sourceMessage'] as Map)
+                : <String, dynamic>{};
+            final senderName = source['senderName']?.toString() ?? 'Sender';
+            final content = source['content']?.toString() ?? '';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.38),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colorScheme.outline.withValues(alpha: 0.08),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.event_available_outlined,
+                        size: 16,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        suggestion['title']?.toString() ?? 'Possible Meeting',
+                        style: AppStyle.circularTextStyle(
+                          size: 14,
+                          weight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$senderName said:',
+                          style: AppStyle.circularTextStyle(
+                            size: 11,
+                            weight: FontWeight.w700,
+                            color: palette.secondaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          content,
+                          style: AppStyle.circularTextStyle(
+                            size: 13,
+                            weight: FontWeight.w500,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _activeTab = 'summary';
+                          });
+                          _askQuestion(
+                            'Draft a reply accepting this meeting suggestion and proposing suitable times: "$content"',
+                          );
+                        },
+                        icon: const Icon(Icons.calendar_month_rounded, size: 16),
+                        label: const Text('Suggest Times'),
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }()),
+        ],
+      ],
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).take(2).toList();
+    final initials = parts
+        .where((part) => part.isNotEmpty)
+        .map((part) => part[0].toUpperCase())
+        .join();
+    return initials.isEmpty ? 'U' : initials;
+  }
+
   Widget _buildMetricChip(ColorScheme colorScheme, String text, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -293,36 +616,7 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
     );
   }
 
-  Widget _buildProviderSwitch(ColorScheme colorScheme) {
-    return SegmentedButton<String>(
-      segments: const [
-        ButtonSegment(value: 'gemini', label: Text('Gemini')),
-        ButtonSegment(value: 'openai', label: Text('OpenAI')),
-        ButtonSegment(value: 'local', label: Text('Local')),
-      ],
-      selected: {_provider},
-      showSelectedIcon: false,
-      onSelectionChanged: _asking || _loadingSummary
-          ? null
-          : (values) {
-              final nextProvider = values.first;
-              setState(() {
-                _provider = nextProvider;
-                _summary = null;
-                _loadingSummary = true;
-                _error = null;
-              });
-              _loadSummary();
-            },
-      style: SegmentedButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        textStyle: AppStyle.circularTextStyle(
-          size: 12,
-          weight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildTurn(AiChatTurnModel turn, ColorScheme colorScheme) {
     final alignment = turn.isUser
@@ -461,22 +755,35 @@ class _AiConversationSheetState extends ConsumerState<AiConversationSheet> {
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
-              child: _buildProviderSwitch(colorScheme),
+              child: _buildTabSwitch(colorScheme),
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView(
-                controller: _scrollController,
-                children: [
-                  _buildSummary(colorScheme, palette),
-                  const SizedBox(height: 14),
-                  _buildPresetButtons(colorScheme),
-                  const SizedBox(height: 18),
-                  for (final turn in _turns) _buildTurn(turn, colorScheme),
-                ],
-              ),
+              child: _loadingSummary
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        color: colorScheme.primary,
+                      ),
+                    )
+                  : ListView(
+                      controller: _scrollController,
+                      children: [
+                        if (_activeTab == 'summary') ...[
+                          _buildSummaryCard(colorScheme, palette),
+                          const SizedBox(height: 14),
+                          _buildPresetButtons(colorScheme),
+                          const SizedBox(height: 18),
+                          for (final turn in _turns) _buildTurn(turn, colorScheme),
+                        ] else if (_activeTab == 'reply') ...[
+                          _buildNeedReplyView(colorScheme, palette),
+                        ] else if (_activeTab == 'meeting') ...[
+                          _buildScheduleMeetView(colorScheme, palette),
+                        ],
+                      ],
+                    ),
             ),
-            _buildComposer(colorScheme, palette),
+            if (_activeTab == 'summary')
+              _buildComposer(colorScheme, palette),
           ],
         ),
       ),
